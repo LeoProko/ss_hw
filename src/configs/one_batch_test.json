@@ -1,0 +1,153 @@
+{
+  "name": "one_batch_test",
+  "n_gpu": 1,
+  "preprocessing": {
+    "sr": 16000,
+    "spectrogram": {
+      "type": "MelSpectrogram",
+      "args": {
+      }
+    },
+    "log_spec": true
+  },
+  "augmentations": {
+    "wave": [
+      {
+        "type": "Gain",
+        "args": {
+        }
+      },
+      {
+        "type": "GaussianNoise",
+        "args": {
+          "variance": 0.005
+        }
+      },
+      {
+        "type": "Speedup",
+        "args": {
+          "speedup_min": 0.7,
+          "speedup_max": 1.3
+        }
+      }
+    ],
+    "spectrogram": [
+      {
+        "type": "FreqMask",
+        "args": {
+          "freq_mask_param": 30
+        }
+      },
+      {
+        "type": "TimeMask",
+        "args": {
+          "time_mask_param": 30
+        }
+      }
+    ]
+  },
+  "arch": {
+    "type": "Conformer",
+    "args": {
+      "input_dim": 128,
+      "num_heads": 4,
+      "ffn_dim": 128,
+      "num_layers": 4,
+      "kernel_size": 31,
+      "dropout": 0.1
+    }
+  },
+  "data": {
+    "train": {
+      "batch_size": 10,
+      "num_workers": 0,
+      "datasets": [
+        {
+          "type": "LibrispeechDataset",
+          "args": {
+            "part": "dev-clean",
+            "max_audio_length": 20.0,
+            "max_text_length": 200,
+            "limit": 10
+          }
+        }
+      ]
+    },
+    "val": {
+      "batch_size": 10,
+      "num_workers": 0,
+      "datasets": [
+        {
+          "type": "LibrispeechDataset",
+          "args": {
+            "part": "dev-clean",
+            "max_audio_length": 20.0,
+            "max_text_length": 200,
+            "limit": 10
+          }
+        }
+      ]
+    }
+  },
+  "optimizer": {
+    "type": "Adam",
+    "args": {
+      "lr": 4e-3
+    }
+  },
+  "loss": {
+    "type": "CTCLoss",
+    "args": {}
+  },
+  "metrics": [
+    {
+      "type": "ArgmaxWERMetric",
+      "args": {
+        "name": "WER (argmax)"
+      }
+    },
+    {
+      "type": "ArgmaxCERMetric",
+      "args": {
+        "name": "CER (argmax)"
+      }
+    },
+    {
+      "type": "BeamSearchWERMetric",
+      "args": {
+        "name": "WER (beam search)",
+        "beam_size": 10
+      }
+    },
+    {
+      "type": "BeamSearchCERMetric",
+      "args": {
+        "name": "CER (beam search)",
+        "beam_size": 10
+      }
+    }
+  ],
+  "lr_scheduler": {
+    "type": "OneCycleLR",
+    "args": {
+      "steps_per_epoch": 100,
+      "epochs": 50,
+      "anneal_strategy": "cos",
+      "max_lr": 4e-3,
+      "pct_start": 0.1
+    }
+  },
+  "trainer": {
+    "beam_size": 10,
+    "epochs": 50,
+    "save_dir": "saved/",
+    "save_period": 5,
+    "verbosity": 2,
+    "monitor": "min val_loss",
+    "early_stop": 100,
+    "visualize": "wandb",
+    "wandb_project": "dla-1-asr",
+    "len_epoch": 100,
+    "grad_norm_clip": 10
+  }
+}
