@@ -21,9 +21,7 @@ def from_configs(configs: ConfigParser):
     ):
         for aug_dict in configs.config["augmentations"]["spectrogram"]:
             spec_augs.append(
-                configs.init_obj(
-                    aug_dict, src.augmentations.spectrogram_augmentations
-                )
+                configs.init_obj(aug_dict, src.augmentations.spectrogram_augmentations)
             )
     return _to_function(wave_augs), _to_function(spec_augs)
 
