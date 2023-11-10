@@ -258,7 +258,7 @@ class MixtureGenerator:
 
 if __name__ == "__main__":
     path_train = "data/datasets/librispeech/train-clean-100"
-    path_val = "data/datasets/librispeech/dev-clean"
+    path_val = "data/datasets/librispeech/test-clean"
 
     path_mixtures_train = "data/datasets/librispeech_ss/train"
     path_mixtures_val = "data/datasets/librispeech_ss/val"
@@ -276,25 +276,26 @@ if __name__ == "__main__":
     ]
 
     mixer_train = MixtureGenerator(
-        speakers_files_train, path_mixtures_train, nfiles=100, test=False
+        speakers_files_train, path_mixtures_train, nfiles=10000, test=True
     )
 
-    # mixer_val = MixtureGenerator(
-    #     speakers_files_val, path_mixtures_val, nfiles=1000, test=True
-    # )
+    mixer_val = MixtureGenerator(
+        speakers_files_val, path_mixtures_val, nfiles=1000, test=True
+    )
+
     mixer_train.generate_mixes(
         snr_levels=[-5, 5],
         num_workers=8,
         update_steps=100,
         trim_db=20,
         vad_db=20,
-        audioLen=3,
+        audioLen=20,
     )
-    # mixer_val.generate_mixes(
-    #     snr_levels=[-5, 5],
-    #     num_workers=8,
-    #     update_steps=100,
-    #     trim_db=None,
-    #     vad_db=20,
-    #     audioLen=20,
-    # )
+    mixer_val.generate_mixes(
+        snr_levels=[-5, 5],
+        num_workers=8,
+        update_steps=100,
+        trim_db=None,
+        vad_db=20,
+        audioLen=20,
+    )

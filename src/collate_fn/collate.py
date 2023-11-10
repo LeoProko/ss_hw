@@ -13,28 +13,28 @@ def collate_fn(dataset_items: List[dict]):
     Collate and pad fields in dataset items
     """
 
-    specs = [item["spectrogram"].squeeze() for item in dataset_items]
-    max_spec_len = max([spec.size(-1) for spec in specs])
-    specs = pad_sequence(
-        [pad(spec, (0, max_spec_len - spec.size(-1))) for spec in specs],
+    refs = [item["ref"].squeeze() for item in dataset_items]
+    mixs = [item["ref"].squeeze() for item in dataset_items]
+    targets = [item["ref"].squeeze() for item in dataset_items]
+    lengths = [mix.size(-1) for mix in mixs]
+    max_spec_len = max(lengths)
+
+    mixs = pad_sequence(
+        [pad(mix, (0, max_spec_len - mix.size(-1))) for mix in mixs],
+        batch_first=True,
+    )
+    refs = pad_sequence(
+        [pad(ref, (0, max_spec_len - ref.size(-1))) for ref in refs],
+        batch_first=True,
+    )
+    targets = pad_sequence(
+        [pad(target, (0, max_spec_len - target.size(-1))) for target in targets],
         batch_first=True,
     )
 
     return {
-        "audio": pad_sequence(
-            [item["audio"].squeeze() for item in dataset_items], batch_first=True
-        ),
-        "spectrogram": specs,
-        "spectrogram_length": torch.tensor(
-            [item["spectrogram"].squeeze().size(-1) for item in dataset_items],
-        ),
-        "duration": [item["duration"] for item in dataset_items],
-        "text": [item["text"] for item in dataset_items],
-        "text_encoded": pad_sequence(
-            [item["text_encoded"].squeeze() for item in dataset_items], batch_first=True
-        ),
-        "text_encoded_length": torch.tensor(
-            [len(item["text_encoded"].squeeze()) for item in dataset_items],
-        ),
-        "audio_path": [item["audio_path"] for item in dataset_items],
+        "mix": mixs,
+        "ref": refs,
+        "target": targets,
+        "length": torch.tensor(lengths),
     }

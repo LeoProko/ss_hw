@@ -4,7 +4,7 @@
   "preprocessing": {
     "sr": 16000,
     "spectrogram": {
-      "type": "MelSpectrogram",
+      "type": "MFCC",
       "args": {
       }
     },
@@ -19,12 +19,16 @@
   "arch": {
     "type": "SpEx",
     "args": {
-      "n_feats": 128,
-      "num_heads": 4,
-      "ffn_dim": 128,
-      "num_layers": 4,
-      "kernel_size": 31,
-      "dropout": 0.1
+      "L1": 20,
+      "L2": 80,
+      "L3": 160,
+      "N": 256,
+      "B": 8,
+      "O": 256,
+      "P": 512,
+      "Q": 3,
+      "num_spks": 2,
+      "spk_embed_dim": 256
     }
   },
   "data": {
@@ -58,7 +62,7 @@
   "optimizer": {
     "type": "Adam",
     "args": {
-      "lr": 4e-3
+      "lr": 3e-4
     }
   },
   "loss": {
@@ -66,18 +70,6 @@
     "args": {}
   },
   "metrics": [
-    {
-      "type": "ArgmaxWERMetric",
-      "args": {
-        "name": "WER (argmax)"
-      }
-    },
-    {
-      "type": "ArgmaxCERMetric",
-      "args": {
-        "name": "CER (argmax)"
-      }
-    }
   ],
   "lr_scheduler": {
     "type": "OneCycleLR",

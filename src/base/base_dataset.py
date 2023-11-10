@@ -17,8 +17,6 @@ logger = logging.getLogger(__name__)
 class BaseDataset(Dataset):
     def __init__(
         self,
-        index,
-        text_encoder: BaseTextEncoder,
         config_parser: ConfigParser,
         wave_augs=None,
         spec_augs=None,
@@ -26,20 +24,13 @@ class BaseDataset(Dataset):
         max_audio_length=None,
         max_text_length=None,
     ):
-        self.text_encoder = text_encoder
         self.config_parser = config_parser
         self.wave_augs = wave_augs
         self.spec_augs = spec_augs
         self.log_spec = config_parser["preprocessing"]["log_spec"]
 
-        self._assert_index_is_valid(index)
-        index = self._filter_records_from_dataset(
-            index, max_audio_length, max_text_length, limit
-        )
         # it's a good idea to sort index by audio length
         # It would be easier to write length-based batch samplers later
-        index = self._sort_index(index)
-        self._index: List[dict] = index
 
     def __getitem__(self, ind):
         data_dict = self._index[ind]
@@ -51,13 +42,8 @@ class BaseDataset(Dataset):
             "spectrogram": audio_spec,
             "duration": audio_wave.size(1) / self.config_parser["preprocessing"]["sr"],
             "text": data_dict["text"],
-            "text_encoded": self.text_encoder.encode(data_dict["text"]),
             "audio_path": audio_path,
         }
-
-    @staticmethod
-    def _sort_index(index):
-        return sorted(index, key=lambda x: x["audio_len"])
 
     def __len__(self):
         return len(self._index)
