@@ -34,27 +34,25 @@
   },
   "data": {
     "train": {
-      "batch_size": 2,
+      "batch_size": 10,
       "num_workers": 0,
       "datasets": [
         {
           "type": "LibrispeechSSDataset",
           "args": {
-            "data_dir": "data/datasets/librispeech_ss/train",
-            "limit": 10
+            "data_dir": "data/datasets/librispeech_ss/train"
           }
         }
       ]
     },
     "val": {
-      "batch_size": 2,
+      "batch_size": 10,
       "num_workers": 0,
       "datasets": [
         {
           "type": "LibrispeechSSDataset",
           "args": {
-            "data_dir": "data/datasets/librispeech_ss/val",
-            "limit": 10
+            "data_dir": "data/datasets/librispeech_ss/val"
           }
         }
       ]
