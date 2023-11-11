@@ -113,7 +113,8 @@ def create_mix(idx, triplet, snr_levels, out_dir, test=False, sr=16000, **kwargs
     snr = np.random.choice(snr_levels, 1).item()
 
     if not test:
-        s1, s2 = vad_merge(s1, vad_db), vad_merge(s2, vad_db)
+        # s1, s2 = vad_merge(s1, vad_db), vad_merge(s2, vad_db)
+        s1, s2 = fix_length(s1, s2, "max")
         s1_cut, s2_cut = cut_audios(s1, s2, audioLen, sr)
 
         for i in range(len(s1_cut)):
@@ -282,11 +283,11 @@ if __name__ == "__main__":
     ]
 
     mixer_train = MixtureGenerator(
-        speakers_files_train, path_mixtures_train, nfiles=10000, test=True
+        speakers_files_train, path_mixtures_train, nfiles=3_000, test=False
     )
 
     mixer_val = MixtureGenerator(
-        speakers_files_val, path_mixtures_val, nfiles=1000, test=True
+        speakers_files_val, path_mixtures_val, nfiles=300, test=False
     )
 
     mixer_train.generate_mixes(
