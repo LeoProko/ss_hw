@@ -2,11 +2,15 @@ import os
 import glob
 import random
 from concurrent.futures import ProcessPoolExecutor
+import warnings
+
+warnings.filterwarnings("ignore")
 
 import librosa
 import soundfile as sf
 import pyloudnorm as pyln
 import numpy as np
+
 
 def snr_mixer(clean, noise, snr):
     amp_noise = np.linalg.norm(clean) / 10 ** (snr / 20)
@@ -77,9 +81,9 @@ def create_mix(idx, triplet, snr_levels, out_dir, test=False, sr=16000, **kwargs
     louds2 = meter.integrated_loudness(s2)
     loudsRef = meter.integrated_loudness(ref)
 
-    s1Norm = pyln.normalize.loudness(s1, louds1, -29)
-    s2Norm = pyln.normalize.loudness(s2, louds2, -29)
-    refNorm = pyln.normalize.loudness(ref, loudsRef, -23.0)
+    s1Norm = pyln.normalize.loudness(s1, louds1, -20)
+    s2Norm = pyln.normalize.loudness(s2, louds2, -20)
+    refNorm = pyln.normalize.loudness(ref, loudsRef, -20.0)
 
     amp_s1 = np.max(np.abs(s1Norm))
     amp_s2 = np.max(np.abs(s2Norm))
@@ -116,9 +120,9 @@ def create_mix(idx, triplet, snr_levels, out_dir, test=False, sr=16000, **kwargs
             mix = snr_mixer(s1_cut[i], s2_cut[i], snr)
 
             louds1 = meter.integrated_loudness(s1_cut[i])
-            s1_cut[i] = pyln.normalize.loudness(s1_cut[i], louds1, -23.0)
+            s1_cut[i] = pyln.normalize.loudness(s1_cut[i], louds1, -20.0)
             loudMix = meter.integrated_loudness(mix)
-            mix = pyln.normalize.loudness(mix, loudMix, -23.0)
+            mix = pyln.normalize.loudness(mix, loudMix, -20.0)
 
             path_mix_i = path_mix.replace("-mixed.wav", f"_{i}-mixed.wav")
             path_target_i = path_target.replace("-target.wav", f"_{i}-target.wav")
@@ -130,10 +134,10 @@ def create_mix(idx, triplet, snr_levels, out_dir, test=False, sr=16000, **kwargs
         s1, s2 = fix_length(s1, s2, "max")
         mix = snr_mixer(s1, s2, snr)
         louds1 = meter.integrated_loudness(s1)
-        s1 = pyln.normalize.loudness(s1, louds1, -23.0)
+        s1 = pyln.normalize.loudness(s1, louds1, -20.0)
 
         loudMix = meter.integrated_loudness(mix)
-        mix = pyln.normalize.loudness(mix, loudMix, -23.0)
+        mix = pyln.normalize.loudness(mix, loudMix, -20.0)
 
         sf.write(path_mix, mix, sr)
         sf.write(path_target, s1, sr)
@@ -266,6 +270,8 @@ if __name__ == "__main__":
     speakersTrain = [el.name for el in os.scandir(path_train)]
     speakersVal = [el.name for el in os.scandir(path_val)]
 
+    print("Train speakers num", len(speakersTrain))
+
     speakers_files_train = [
         LibriSpeechSpeakerFiles(i, path_train, audioTemplate="*.flac")
         for i in speakersTrain
@@ -287,15 +293,15 @@ if __name__ == "__main__":
         snr_levels=[-5, 5],
         num_workers=8,
         update_steps=100,
-        trim_db=20,
-        vad_db=20,
-        audioLen=20,
+        trim_db=None,
+        vad_db=None,
+        audioLen=3,
     )
     mixer_val.generate_mixes(
         snr_levels=[-5, 5],
         num_workers=8,
         update_steps=100,
         trim_db=None,
-        vad_db=20,
-        audioLen=20,
+        vad_db=None,
+        audioLen=3,
     )

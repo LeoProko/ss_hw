@@ -19,21 +19,22 @@
   "arch": {
     "type": "SpEx",
     "args": {
-      "L1": 20,
-      "L2": 80,
-      "L3": 160,
-      "N": 256,
-      "B": 8,
-      "O": 256,
-      "P": 512,
-      "Q": 3,
-      "num_spks": 2,
-      "spk_embed_dim": 256
+      "short_window_len": 40,
+      "middle_window_len": 160,
+      "long_window_len": 320,
+      "decoder_dim": 64,
+      "res_blocks_num": 3,
+      "tcn_depth": 4,
+      "tcn_in_channels": 64,
+      "tcn_out_channels": 128,
+      "tcn_kernel_size": 3,
+      "speakers_num": 251,
+      "speakers_emb_dim": 64
     }
   },
   "data": {
     "train": {
-      "batch_size": 10,
+      "batch_size": 2,
       "num_workers": 0,
       "datasets": [
         {
@@ -46,7 +47,7 @@
       ]
     },
     "val": {
-      "batch_size": 10,
+      "batch_size": 2,
       "num_workers": 0,
       "datasets": [
         {
@@ -70,6 +71,19 @@
     "args": {}
   },
   "metrics": [
+    {
+      "type": "PESQMetric",
+      "args": {
+        "sr": 16000,
+        "name": "PESQ"
+      }
+    },
+    {
+      "type": "SISDRMetric",
+      "args": {
+        "name": "SISDR"
+      }
+    }
   ],
   "lr_scheduler": {
     "type": "OneCycleLR",

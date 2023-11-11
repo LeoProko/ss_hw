@@ -1,344 +1,324 @@
 import torch
-from torch import nn
-import torch.nn as nn
-import torch.nn.functional as F
 
-from src.base import BaseModel
+from src import base
 
 
-class TCNBlock(nn.Module):
-    """
-    Temporal convolutional network block,
-        1x1Conv - PReLU - Norm - DConv - PReLU - Norm - SConv
-    Input: 3D tensor witorch [N, C_in, L_in]
-    Output: 3D tensor witorch [N, C_out, L_out]
-    """
-
-    def __init__(
-        self,
-        in_channels=256,
-        conv_channels=512,
-        kernel_size=3,
-        dilation=1,
-    ):
-        super(TCNBlock, self).__init__()
-        self.conv1x1 = nn.Conv1d(in_channels, conv_channels, 1)
-        self.prelu1 = nn.PReLU()
-        self.norm1 = nn.LayerNorm(conv_channels)
-        dconv_pad = (
-            (dilation * (kernel_size - 1)) // 2
-        )
-        self.dconv = nn.Conv1d(
-            conv_channels,
-            conv_channels,
-            kernel_size,
-            groups=conv_channels,
-            padding=dconv_pad,
-            dilation=dilation,
-        )
-        self.prelu2 = nn.PReLU()
-        self.norm2 = nn.LayerNorm(conv_channels, elementwise_affine=True)
-        self.sconv = nn.Conv1d(conv_channels, in_channels, 1, bias=True)
-        self.dconv_pad = dconv_pad
-
-    def forward(self, x):
-        y = self.conv1x1(x)
-        y = self.norm1(self.prelu1(y))
-        y = self.dconv(y)
-        y = self.norm2(self.prelu2(y))
-        y = self.sconv(y)
-        y += x
-        return y
-
-
-class TCNBlock_Spk(nn.Module):
-    """
-    Temporal convolutional network block,
-        1x1Conv - PReLU - Norm - DConv - PReLU - Norm - SConv
-        torche first tcn block takes additional speaker embedding as inputs
-    Input: 3D tensor witorch [N, C_in, L_in]
-    Input Speaker Embedding: 2D tensor witorch [N, D]
-    Output: 3D tensor witorch [N, C_out, L_out]
-    """
-
-    def __init__(
-        self,
-        in_channels=256,
-        spk_embed_dim=100,
-        conv_channels=512,
-        kernel_size=3,
-        dilation=1,
-    ):
-        super(TCNBlock_Spk, self).__init__()
-        self.conv1x1 = nn.Conv1d(in_channels + spk_embed_dim, conv_channels, 1)
-        self.prelu1 = nn.PReLU()
-        self.norm1 = nn.LayerNorm(conv_channels, elementwise_affine=True)
-        dconv_pad = (
-            (dilation * (kernel_size - 1)) // 2
-        )
-        self.dconv = nn.Conv1d(
-            conv_channels,
-            conv_channels,
-            kernel_size,
-            groups=conv_channels,
-            padding=dconv_pad,
-            dilation=dilation,
-            bias=True,
-        )
-        self.prelu2 = nn.PReLU()
-        self.norm2 = nn.LayerNorm(conv_channels, elementwise_affine=True)
-        self.sconv = nn.Conv1d(conv_channels, in_channels, 1, bias=True)
-        self.dconv_pad = dconv_pad
-        self.dilation = dilation
-
-    def forward(self, x, aux):
-        # Repeatedly concated speaker embedding aux to each frame of torche representation x
-        T = x.shape[-1]
-        aux = torch.unsqueeze(aux, -1)
-        aux = aux.repeat(1, 1, T)
-        y = torch.cat([x, aux], 1)
-        y = self.conv1x1(y)
-        y = self.norm1(self.prelu1(y))
-        y = self.dconv(y)
-        y = self.norm2(self.prelu2(y))
-        y = self.sconv(y)
-        y += x
-        return y
-
-
-class ResBlock(nn.Module):
-    """
-    Resnet block for speaker encoder to obtain speaker embedding
-    ref to
-        https://gitorchub.com/fatchord/WaveRNN/blob/master/models/fatchord_version.py
-        and
-        https://gitorchub.com/Jungjee/RawNet/blob/master/PyTorch/model_RawNet.py
-    """
-
+class ResNetBlock(torch.nn.Module):
     def __init__(self, in_dims, out_dims):
-        super(ResBlock, self).__init__()
-        self.conv1 = nn.Conv1d(in_dims, out_dims, kernel_size=1, bias=False)
-        self.conv2 = nn.Conv1d(out_dims, out_dims, kernel_size=1, bias=False)
-        self.batch_norm1 = nn.BatchNorm1d(out_dims)
-        self.batch_norm2 = nn.BatchNorm1d(out_dims)
-        self.prelu1 = nn.PReLU()
-        self.prelu2 = nn.PReLU()
-        self.maxpool = nn.MaxPool1d(3)
-        if in_dims != out_dims:
-            self.downsample = True
-            self.conv_downsample = nn.Conv1d(
-                in_dims, out_dims, kernel_size=1, bias=False
-            )
-        else:
-            self.downsample = False
+        super().__init__()
 
-    def forward(self, x):
-        y = self.conv1(x)
-        y = self.batch_norm1(y)
-        y = self.prelu1(y)
-        y = self.conv2(y)
-        y = self.batch_norm2(y)
-        if self.downsample:
-            y += self.conv_downsample(x)
-        else:
-            y += x
-        y = self.prelu2(y)
-        return self.maxpool(y)
+        self.seq = torch.nn.Sequential(
+            torch.nn.Conv1d(in_dims, out_dims, 1),
+            torch.nn.BatchNorm1d(out_dims),
+            torch.nn.PReLU(),
+            torch.nn.Conv1d(out_dims, out_dims, 1),
+            torch.nn.BatchNorm1d(out_dims),
+        )
+        self.prelu = torch.nn.PReLU()
+        self.maxpool = torch.nn.MaxPool1d(3)
+
+    def forward(self, input):
+        x = self.seq(input) + input
+        x = self.prelu(x)
+        x = self.maxpool(x)
+
+        return x
 
 
-class SpEx(BaseModel):
+class EncoderBlock(torch.nn.Module):
     def __init__(
         self,
-        L1,
-        L2,
-        L3,
-        N,
-        B,
-        O,
-        P,
-        Q,
-        num_spks,
-        spk_embed_dim=256,
+        short_window_len,
+        middle_window_len,
+        long_window_len,
+        decoder_dim,
+    ):
+        super().__init__()
+
+        self.encoder_short = torch.nn.Sequential(
+            torch.nn.Conv1d(1, decoder_dim, short_window_len, short_window_len // 2),
+            torch.nn.ReLU(),
+        )
+        self.encoder_middle = torch.nn.Sequential(
+            torch.nn.Conv1d(1, decoder_dim, middle_window_len, short_window_len // 2),
+            torch.nn.ReLU(),
+        )
+        self.encoder_long = torch.nn.Sequential(
+            torch.nn.Conv1d(1, decoder_dim, long_window_len, short_window_len // 2),
+            torch.nn.ReLU(),
+        )
+
+    def forward(self, audio):
+        x_1 = self.encoder_short(audio)
+        x_2 = self.encoder_middle(audio)
+        x_3 = self.encoder_long(audio)
+
+        x_1 = x_1[:, :, : x_3.size(-1)]
+        x_2 = x_2[:, :, : x_3.size(-1)]
+
+        return x_1, x_2, x_3
+
+
+class DecoderBlock(torch.nn.Module):
+    def __init__(
+        self,
+        tcn_in_channels,
+        short_window_len,
+        middle_window_len,
+        long_window_len,
+        decoder_dim,
+    ):
+        super().__init__()
+
+        self.m_1 = torch.nn.Sequential(
+            torch.nn.Conv1d(tcn_in_channels, decoder_dim, 1),
+            torch.nn.ReLU(),
+        )
+        self.m_2 = torch.nn.Sequential(
+            torch.nn.Conv1d(tcn_in_channels, decoder_dim, 1),
+            torch.nn.ReLU(),
+        )
+        self.m_3 = torch.nn.Sequential(
+            torch.nn.Conv1d(tcn_in_channels, decoder_dim, 1),
+            torch.nn.ReLU(),
+        )
+
+        self.decoder_short = torch.nn.ConvTranspose1d(
+            decoder_dim, 1, kernel_size=short_window_len, stride=short_window_len // 2
+        )
+        self.decoder_middle = torch.nn.ConvTranspose1d(
+            decoder_dim, 1, kernel_size=middle_window_len, stride=short_window_len // 2
+        )
+        self.decoder_long = torch.nn.ConvTranspose1d(
+            decoder_dim, 1, kernel_size=long_window_len, stride=short_window_len // 2
+        )
+
+    def forward(self, y_1, y_2, y_3, y):
+        m_1 = self.m_1(y)
+        m_2 = self.m_2(y)
+        m_3 = self.m_3(y)
+
+        s_1 = self.decoder_short(m_1 * y_1)
+        s_2 = self.decoder_middle(m_2 * y_2)
+        s_3 = self.decoder_long(m_3 * y_3)
+
+        return s_1, s_2, s_3
+
+
+class TCNBlock(torch.nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        dilation,
+    ):
+        super().__init__()
+
+        self.prelu = torch.nn.PReLU()
+        self.cnn_1 = torch.nn.Conv1d(in_channels, out_channels, 1)
+        self.norm_1 = torch.nn.LayerNorm(out_channels)
+        self.de_cnn = torch.nn.Conv1d(
+            out_channels,
+            out_channels,
+            kernel_size,
+            groups=out_channels,
+            padding=dilation * (kernel_size - 1) // 2,
+            dilation=dilation,
+        )
+        self.norm_2 = torch.nn.LayerNorm(out_channels)
+        self.cnn_2 = torch.nn.Conv1d(out_channels, in_channels, 1)
+
+    @staticmethod
+    def make_seq(depth, **kwargs):
+        return torch.nn.Sequential(
+            *[TCNBlock(**kwargs, dilation=2**i) for i in range(1, depth)]
+        )
+
+    def forward(self, input):
+        x = self.cnn_1(input)
+        x = self.prelu(x)
+        x = self.norm_1(x.transpose(1, 2)).transpose(1, 2)
+        x = self.de_cnn(x)
+        x = self.prelu(x)
+        x = self.norm_2(x.transpose(1, 2)).transpose(1, 2)
+        x = self.cnn_2(x)
+
+        return x + input
+
+
+class SpeakexExtractorBlock(torch.nn.Module):
+    def __init__(
+        self,
+        speakers_emb_dim,
+        in_channels,
+        out_channels,
+        kernel_size,
+        dilation,
+    ):
+        super().__init__()
+
+        assert dilation * (kernel_size - 1) % 2 == 0
+
+        self.prelu = torch.nn.PReLU()
+        self.cnn_1 = torch.nn.Conv1d(in_channels + speakers_emb_dim, out_channels, 1)
+        self.norm_1 = torch.nn.LayerNorm(out_channels)
+        self.de_cnn = torch.nn.Conv1d(
+            out_channels,
+            out_channels,
+            kernel_size,
+            groups=out_channels,
+            padding=(dilation * (kernel_size - 1)) // 2,
+            dilation=dilation,
+        )
+        self.norm_2 = torch.nn.LayerNorm(out_channels)
+        self.cnn_2 = torch.nn.Conv1d(out_channels, in_channels, 1)
+
+    def forward(self, mix, ref):
+        ref = ref.unsqueeze(-1)
+        ref = ref.repeat(1, 1, mix.size(-1))
+        y = torch.cat([mix, ref], 1)
+        y = self.cnn_1(y)
+        y = self.norm_1(self.prelu(y).transpose(1, 2)).transpose(1, 2)
+        y = self.de_cnn(y)
+        y = self.norm_2(self.prelu(y).transpose(1, 2)).transpose(1, 2)
+        y = self.cnn_2(y)
+        y += mix
+        return y
+
+
+class SpEx(base.BaseModel):
+    def __init__(
+        self,
+        short_window_len,
+        middle_window_len,
+        long_window_len,
+        decoder_dim,
+        res_blocks_num,
+        tcn_depth,
+        tcn_in_channels,
+        tcn_out_channels,
+        tcn_kernel_size,
+        speakers_num,
+        speakers_emb_dim,
         **batch,
     ):
         super().__init__(**batch)
-        # n x S => n x N x T, S = 4s*8000 = 32000
-        self.L1 = L1
-        self.L2 = L2
-        self.L3 = L3
-        self.encoder_1d_short = nn.Conv1d(1, N, L1, stride=L1 // 2, padding=0)
-        self.encoder_1d_middle = nn.Conv1d(1, N, L2, stride=L1 // 2, padding=0)
-        self.encoder_1d_long = nn.Conv1d(1, N, L3, stride=L1 // 2, padding=0)
-        # before repeat blocks, always cLN
-        self.ln = nn.LayerNorm(3 * N)
-        # n x N x T => n x O x T
-        self.proj = nn.Conv1d(3 * N, O, 1)
-        self.conv_block_1 = TCNBlock_Spk(
-            spk_embed_dim=spk_embed_dim,
-            in_channels=O,
-            conv_channels=P,
-            kernel_size=Q,
-            dilation=1,
-        )
-        self.conv_block_1_otorcher = self._build_stacks(
-            num_blocks=B, in_channels=O, conv_channels=P, kernel_size=Q, 
-        )
-        self.conv_block_2 = TCNBlock_Spk(
-            spk_embed_dim=spk_embed_dim,
-            in_channels=O,
-            conv_channels=P,
-            kernel_size=Q,
-            dilation=1,
-        )
-        self.conv_block_2_otorcher = self._build_stacks(
-            num_blocks=B, in_channels=O, conv_channels=P, kernel_size=Q, 
-        )
-        self.conv_block_3 = TCNBlock_Spk(
-            spk_embed_dim=spk_embed_dim,
-            in_channels=O,
-            conv_channels=P,
-            kernel_size=Q,
-            dilation=1,
-        )
-        self.conv_block_3_otorcher = self._build_stacks(
-            num_blocks=B, in_channels=O, conv_channels=P, kernel_size=Q, 
-        )
-        self.conv_block_4 = TCNBlock_Spk(
-            spk_embed_dim=spk_embed_dim,
-            in_channels=O,
-            conv_channels=P,
-            kernel_size=Q,
-            dilation=1,
-        )
-        self.conv_block_4_otorcher = self._build_stacks(
-            num_blocks=B, in_channels=O, conv_channels=P, kernel_size=Q, 
-        )
-        # n x O x T => n x N x T
-        self.mask1 = nn.Conv1d(O, N, 1)
-        self.mask2 = nn.Conv1d(O, N, 1)
-        self.mask3 = nn.Conv1d(O, N, 1)
-        # using ConvTrans1D: n x N x T => n x 1 x To
-        # To = (T - 1) * L // 2 + L
-        self.decoder_1d_short = nn.ConvTranspose1d(
-            N, 1, kernel_size=L1, stride=L1 // 2, bias=True
-        )
-        self.decoder_1d_middle = nn.ConvTranspose1d(
-            N, 1, kernel_size=L2, stride=L1 // 2, bias=True
-        )
-        self.decoder_1d_long = nn.ConvTranspose1d(
-            N, 1, kernel_size=L3, stride=L1 // 2, bias=True
-        )
-        self.num_spks = num_spks
 
-        self.spk_encoder = nn.Sequential(
-            nn.LayerNorm(3 * N),
-            nn.Conv1d(3 * N, O, 1),
-            ResBlock(O, O),
-            ResBlock(O, P),
-            ResBlock(P, P),
-            nn.Conv1d(P, spk_embed_dim, 1),
+        self.short_window_len = short_window_len
+
+        self.encoder = EncoderBlock(
+            short_window_len, middle_window_len, long_window_len, decoder_dim
+        )
+        self.decoder = DecoderBlock(
+            tcn_in_channels,
+            short_window_len,
+            middle_window_len,
+            long_window_len,
+            decoder_dim,
         )
 
-        self.pred_linear = nn.Linear(spk_embed_dim, num_spks)
+        self.y_norm = torch.nn.LayerNorm(3 * decoder_dim)
+        self.y_cnn = torch.nn.Conv1d(3 * decoder_dim, tcn_in_channels, 1)
 
-    def _build_stacks(self, num_blocks, **block_kwargs):
-        """
-        Stack B numbers of TCN block, torche first TCN block takes torche speaker embedding
-        """
-        blocks = [
-            TCNBlock(**block_kwargs, dilation=(2**b)) for b in range(1, num_blocks)
-        ]
-        return nn.Sequential(*blocks)
-
-
-
-    def forward(self, spectrogram, **batch):
-        # spectrogram: (B, input_dim, L)
-
-        max_length = torch.max(batch["spectrogram_length"]).item()
-        key_padding_mask = torch.arange(
-            max_length, device=spectrogram.device
-        ).expand(batch["spectrogram_length"].size(0), max_length) >= batch[
-            "spectrogram_length"
-        ].unsqueeze(
-            1
-        ).to(
-            spectrogram.device
+        self.speaker_extractor_1 = SpeakexExtractorBlock(
+            speakers_emb_dim,
+            tcn_in_channels,
+            tcn_out_channels,
+            tcn_kernel_size,
+            1,
+        )
+        self.tcn_seq_1 = TCNBlock.make_seq(
+            depth=tcn_depth,
+            in_channels=tcn_in_channels,
+            out_channels=tcn_out_channels,
+            kernel_size=tcn_kernel_size,
+        )
+        self.speaker_extractor_2 = SpeakexExtractorBlock(
+            speakers_emb_dim,
+            tcn_in_channels,
+            tcn_out_channels,
+            tcn_kernel_size,
+            1,
+        )
+        self.tcn_seq_2 = TCNBlock.make_seq(
+            depth=tcn_depth,
+            in_channels=tcn_in_channels,
+            out_channels=tcn_out_channels,
+            kernel_size=tcn_kernel_size,
+        )
+        self.speaker_extractor_3 = SpeakexExtractorBlock(
+            speakers_emb_dim,
+            tcn_in_channels,
+            tcn_out_channels,
+            tcn_kernel_size,
+            1,
+        )
+        self.tcn_seq_3 = TCNBlock.make_seq(
+            depth=tcn_depth,
+            in_channels=tcn_in_channels,
+            out_channels=tcn_out_channels,
+            kernel_size=tcn_kernel_size,
+        )
+        self.speaker_extractor_4 = SpeakexExtractorBlock(
+            speakers_emb_dim,
+            tcn_in_channels,
+            tcn_out_channels,
+            tcn_kernel_size,
+            1,
+        )
+        self.tcn_seq_4 = TCNBlock.make_seq(
+            depth=tcn_depth,
+            in_channels=tcn_in_channels,
+            out_channels=tcn_out_channels,
+            kernel_size=tcn_kernel_size,
         )
 
-        x = spectrogram.transpose(1, 2)
-        for block in self.blocks:
-            x = block(x, key_padding_mask.T)
+        self.speakers_num = speakers_num
 
-        return {"logits": self.logits_layer(x)}
-    # def forward(self, x, aux, aux_len):
-    def forward(self, **batch):
-        x = batch["mix"]
-        aux = batch["target"]
-        aux_len = batch["length"]
-
-        # if x.dim() >= 3:
-        #     raise RuntimeError(
-        #         "accept 1/2D tensor as input, but got {:d}".format(
-        #             x.dim()
-        #         )
-        #     )
-        # # when inference, only one utt
-        # if x.dim() == 1:
-        #     x = torch.unsqueeze(x, 0)
-
-        # n x 1 x S => n x N x T
-        w1 = F.relu(self.encoder_1d_short(x))
-        T = w1.shape[-1]
-        xlen1 = x.shape[-1]
-        xlen2 = (T - 1) * (self.L1 // 2) + self.L2
-        xlen3 = (T - 1) * (self.L1 // 2) + self.L3
-        w2 = F.relu(self.encoder_1d_middle(F.pad(x, (0, xlen2 - xlen1), "constant", 0)))
-        w3 = F.relu(self.encoder_1d_long(F.pad(x, (0, xlen3 - xlen1), "constant", 0)))
-
-        # n x 3N x T
-        y = self.ln(torch.cat([w1, w2, w3], 1))
-        # n x O x T
-        y = self.proj(y)
-
-        # speaker encoder (share params from speech encoder)
-        aux_w1 = F.relu(self.encoder_1d_short(aux))
-        aux_T_shape = aux_w1.shape[-1]
-        aux_len1 = aux.shape[-1]
-        aux_len2 = (aux_T_shape - 1) * (self.L1 // 2) + self.L2
-        aux_len3 = (aux_T_shape - 1) * (self.L1 // 2) + self.L3
-        aux_w2 = F.relu(
-            self.encoder_1d_middle(F.pad(aux, (0, aux_len2 - aux_len1), "constant", 0))
-        )
-        aux_w3 = F.relu(
-            self.encoder_1d_long(F.pad(aux, (0, aux_len3 - aux_len1), "constant", 0))
+        self.ref_norm = torch.nn.LayerNorm(3 * decoder_dim)
+        self.encoded_ref_seq = torch.nn.Sequential(
+            *[torch.nn.Conv1d(3 * decoder_dim, tcn_in_channels, 1)]
+            + [
+                ResNetBlock(tcn_in_channels, tcn_in_channels)
+                for _ in range(res_blocks_num)
+            ]
+            + [torch.nn.Conv1d(tcn_in_channels, speakers_emb_dim, 1)]
         )
 
-        aux = self.spk_encoder(torch.cat([aux_w1, aux_w2, aux_w3], 1))
-        aux_T = (aux_len - self.L1) // (self.L1 // 2) + 1
-        aux_T = ((aux_T // 3) // 3) // 3
-        aux = torch.sum(aux, -1) / aux_T.view(-1, 1).float()
+        self.pred_linear = torch.nn.Linear(speakers_emb_dim, speakers_num)
 
-        y = self.conv_block_1(y, aux)
-        y = self.conv_block_1_otorcher(y)
-        y = self.conv_block_2(y, aux)
-        y = self.conv_block_2_otorcher(y)
-        y = self.conv_block_3(y, aux)
-        y = self.conv_block_3_otorcher(y)
-        y = self.conv_block_4(y, aux)
-        y = self.conv_block_4_otorcher(y)
+    def extract_speaker(self, y, x):
+        y = self.speaker_extractor_1(y, x)
+        y = self.tcn_seq_1(y)
+        y = self.speaker_extractor_2(y, x)
+        y = self.tcn_seq_2(y)
+        y = self.speaker_extractor_3(y, x)
+        y = self.tcn_seq_3(y)
+        y = self.speaker_extractor_4(y, x)
+        y = self.tcn_seq_4(y)
 
-        # n x N x T
-        m1 = F.relu(self.mask1(y))
-        m2 = F.relu(self.mask2(y))
-        m3 = F.relu(self.mask3(y))
-        S1 = w1 * m1
-        S2 = w2 * m2
-        S3 = w3 * m3
+        return y
 
-        return (
-            self.decoder_1d_short(S1),
-            self.decoder_1d_middle(S2)[:, :xlen1],
-            self.decoder_1d_long(S3)[:, :xlen1],
-            self.pred_linear(aux),
-        )
+    def forward(self, mix, ref, length, *args, **kwargs):
+        y_1, y_2, y_3 = self.encoder(mix)
+        y_123 = torch.cat([y_1, y_2, y_3], 1)
+
+        x = torch.cat([*self.encoder(ref)], 1)
+
+        y = self.y_norm(y_123.transpose(1, 2)).transpose(1, 2)
+        y = self.y_cnn(y)
+
+        x = self.encoded_ref_seq(self.ref_norm(x.transpose(1, 2)).transpose(1, 2))
+
+        # authors' trick
+        den = (
+            (length - self.short_window_len) // (self.short_window_len // 2) + 1
+        ) // (3**3)
+        x = x.sum(dim=-1) / den.view(-1, 1).float()
+
+        y = self.extract_speaker(y, x)
+
+        s_1, s_2, s_3 = self.decoder(y_1, y_2, y_3, y)
+
+        return s_1, s_2, s_3, self.pred_linear(x)

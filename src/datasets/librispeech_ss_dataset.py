@@ -10,31 +10,31 @@ class LibrispeechSSDataset(BaseDataset):
     def __init__(self, data_dir: str, limit: int | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.ref_train = sorted(glob(os.path.join(data_dir, '*-ref.wav')))
-        self.mix_train = sorted(glob(os.path.join(data_dir, '*-mixed.wav')))
-        self.target_train = sorted(glob(os.path.join(data_dir, '*-target.wav')))
+        self.ref = sorted(glob(os.path.join(data_dir, "*-ref.wav")))
+        self.mix = sorted(glob(os.path.join(data_dir, "*-mixed.wav")))
+        self.target = sorted(glob(os.path.join(data_dir, "*-target.wav")))
 
-        assert len(self.ref_train) == len(self.mix_train) == len(self.target_train)
+        assert len(self.ref) == len(self.mix) == len(self.target)
 
         if limit is None:
-            limit = len(ref_train)
+            limit = len(self.ref)
 
-        self.ref_train = self.ref_train[:limit]
-        self.mix_train = self.mix_train[:limit]
-        self.target_train = self.target_train[:limit]
+        speakers = set(
+            self.ref[i].split("/")[-1].split("_")[0] for i in range(len(self.ref))
+        )
+        self.speakers_map = dict((speaker, i) for i, speaker in enumerate(speakers))
 
-
-    def get_spectorgram(self, audio_path: str):
-        audio_wave = self.load_audio(audio_path)
-        audio_wave, audio_spec = self.process_wave(audio_wave)
-        return audio_spec
+        self.ref = self.ref[:limit]
+        self.mix = self.mix[:limit]
+        self.target = self.target[:limit]
 
     def __getitem__(self, idx):
         return {
-            "ref": self.get_spectorgram(self.ref_train[idx]),
-            "mix": self.get_spectorgram(self.mix_train[idx]),
-            "target": self.get_spectorgram(self.target_train[idx]),
+            "ref": self.load_audio(self.ref[idx]),
+            "mix": self.load_audio(self.mix[idx]),
+            "target": self.load_audio(self.target[idx]),
+            "speaker_id": self.speakers_map[self.ref[idx].split("/")[-1].split("_")[0]],
         }
 
     def __len__(self):
-        return len(self.ref_train)
+        return len(self.ref)

@@ -1,26 +1,15 @@
-import random
-from pathlib import Path
-from random import shuffle
-
-import PIL
-import pandas as pd
 import torch
-import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm_
-from torchvision.transforms import ToTensor
+from torchmetrics.audio import ScaleInvariantSignalDistortionRatio as SISDR
+from torchmetrics.audio.pesq import PerceptualEvaluationSpeechQuality as PESQ
 from tqdm.auto import tqdm
+import pyloudnorm as pyln
 
 from src.base import BaseTrainer
-from src.logger.utils import plot_spectrogram_to_buf
-from src.metric.utils import calc_cer, calc_wer
 from src.utils import inf_loop, MetricTracker
 
 
 class Trainer(BaseTrainer):
-    """
-    Trainer class
-    """
-
     def __init__(
         self,
         model,
@@ -38,6 +27,7 @@ class Trainer(BaseTrainer):
         self.skip_oom = skip_oom
         self.config = config
         self.train_dataloader = dataloaders["train"]
+        self.ce_loss = torch.nn.CrossEntropyLoss()
         if len_epoch is None:
             # epoch-based training
             self.len_epoch = len(self.train_dataloader)
@@ -49,7 +39,7 @@ class Trainer(BaseTrainer):
             k: v for k, v in dataloaders.items() if k != "train"
         }
         self.lr_scheduler = lr_scheduler
-        self.log_step = 50
+        self.log_step = 20
 
         self.train_metrics = MetricTracker(
             "loss", "grad norm", *[m.name for m in self.metrics], writer=self.writer
@@ -63,7 +53,7 @@ class Trainer(BaseTrainer):
         """
         Move all necessary tensors to the HPU
         """
-        for tensor_for_gpu in ["mix", "ref", "target", "length"]:
+        for tensor_for_gpu in ["mix", "ref", "target", "speaker_id"]:
             batch[tensor_for_gpu] = batch[tensor_for_gpu].to(device)
         return batch
 
@@ -72,6 +62,24 @@ class Trainer(BaseTrainer):
             clip_grad_norm_(
                 self.model.parameters(), self.config["trainer"]["grad_norm_clip"]
             )
+
+    @torch.no_grad()
+    def normalize_audio(self, audios: torch.Tensor):
+        meter = pyln.Meter(self.config["preprocessing"]["sr"])
+        audios = [audio.squeeze().detach().cpu().numpy() for audio in audios]
+
+        return torch.stack(
+            [
+                torch.from_numpy(
+                    pyln.normalize.loudness(
+                        audio,
+                        meter.integrated_loudness(audio),
+                        -20.0,
+                    )
+                )
+                for audio in audios
+            ]
+        ).unsqueeze(1)
 
     def _train_epoch(self, epoch):
         """
@@ -114,10 +122,7 @@ class Trainer(BaseTrainer):
                     "learning rate", self.lr_scheduler.get_last_lr()[0]
                 )
                 self._log_predictions(is_train=True, **batch)
-                self._log_spectrogram(batch["spectrogram"])
                 self._log_scalars(self.train_metrics)
-                # we don't want to reset train metrics at the start of every epoch
-                # because we are interested in recent train metrics
                 last_train_metrics = self.train_metrics.result()
                 self.train_metrics.reset()
             if batch_idx >= self.len_epoch:
@@ -130,21 +135,62 @@ class Trainer(BaseTrainer):
 
         return log
 
+    @staticmethod
+    def si_sdr(est, target):
+        alpha = (target * est).sum(dim=-1) / (target.norm(dim=-1) ** 2 + 1e-8)
+        return 20 * torch.log10(
+            (alpha * target).norm(dim=-1) / ((alpha * target - est).norm(dim=-1) + 1e-8)
+            + 1e-8
+        )
+
+    def compute_loss(self, batch, is_train):
+        short_logits, middle_logits, long_logits, speaker_logits = self.model(**batch)
+
+        batch["pred"] = self.normalize_audio(short_logits)
+
+        target = batch["target"]
+
+        max_size = (
+            torch.tensor(
+                [
+                    short_logits.size(-1),
+                    middle_logits.size(-1),
+                    long_logits.size(-1),
+                    target.size(-1),
+                ]
+            )
+            .min()
+            .item()
+        )
+
+        short_logits = short_logits[:, :, :max_size]
+        middle_logits = middle_logits[:, :, :max_size]
+        long_logits = long_logits[:, :, :max_size]
+        target = target[:, :, :max_size]
+
+        snr1 = self.si_sdr(short_logits, target)
+        snr2 = self.si_sdr(middle_logits, target)
+        snr3 = self.si_sdr(long_logits, target)
+        snr_loss = (
+            -0.8 * torch.sum(snr1) - 0.1 * torch.sum(snr2) - 0.1 * torch.sum(snr3)
+        ) / batch["mix"].size(0)
+
+        if is_train:
+            ce_loss = self.ce_loss(speaker_logits, batch["speaker_id"])
+        else:
+            ce_loss = 0
+
+        batch["loss"] = snr_loss + 10 * ce_loss
+
+        return batch
+
     def process_batch(self, batch, is_train: bool, metrics: MetricTracker):
         batch = self.move_batch_to_device(batch, self.device)
         if is_train:
             self.optimizer.zero_grad()
-        outputs = self.model(**batch)
-        if type(outputs) is dict:
-            batch.update(outputs)
-        else:
-            batch["logits"] = outputs
 
-        batch["log_probs"] = F.log_softmax(batch["logits"], dim=-1)
-        batch["log_probs_length"] = self.model.transform_input_lengths(
-            batch["spectrogram_length"]
-        )
-        batch["loss"] = self.criterion(**batch)
+        batch = self.compute_loss(batch, is_train)
+
         if is_train:
             batch["loss"].backward()
             self._clip_grad_norm()
@@ -153,9 +199,10 @@ class Trainer(BaseTrainer):
                 self.lr_scheduler.step()
 
         metrics.update("loss", batch["loss"].item())
-        if is_train:
-            for met in self.metrics:
-                metrics.update(met.name, met(**batch))
+
+        for met in self.metrics:
+            metrics.update(met.name, met(**batch))
+
         return batch
 
     def _evaluation_epoch(self, epoch, part, dataloader):
@@ -181,7 +228,6 @@ class Trainer(BaseTrainer):
             self.writer.set_step(epoch * self.len_epoch, part)
             self._log_scalars(self.evaluation_metrics)
             self._log_predictions(is_train=False, **batch)
-            self._log_spectrogram(batch["spectrogram"])
 
         # add histogram of model parameters to the tensorboard
         for name, p in self.model.named_parameters():
@@ -201,81 +247,34 @@ class Trainer(BaseTrainer):
     def _log_predictions(
         self,
         is_train,
-        text,
-        log_probs,
-        log_probs_length,
-        audio_path,
+        target,
+        pred,
+        mix,
         examples_to_log=10,
         *args,
         **kwargs,
     ):
-        pass
-        # TODO: implement logging of beam search results
-        # if self.writer is None:
-        #     return
-        # argmax_inds = log_probs.cpu().argmax(-1).numpy()
-        # argmax_inds = [
-        #     inds[: int(ind_len)]
-        #     for inds, ind_len in zip(argmax_inds, log_probs_length.numpy())
-        # ]
-        # argmax_texts_raw = [self.text_encoder.decode(inds) for inds in argmax_inds]
-        # argmax_texts = [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
+        if self.writer is None:
+            return
 
-        # tuples = list(
-        #     zip(
-        #         argmax_texts,
-        #         log_probs,
-        #         log_probs_length,
-        #         text,
-        #         argmax_texts_raw,
-        #         audio_path,
-        #     )
-        # )
-        # shuffle(tuples)
+        step = "train" if is_train else "val"
 
-        # rows = {}
-        # for (
-        #     argmax_pred,
-        #     log_prob,
-        #     log_prob_length,
-        #     target,
-        #     raw_pred,
-        #     audio_path,
-        # ) in tuples[:examples_to_log]:
-        #     if not is_train:
-        #         beam_pred = self.text_encoder.ctc_beam_search(
-        #             log_prob.exp(), log_prob_length, self.config["trainer"]["beam_size"]
-        #         )[0].text
-
-        #     target = BaseTextEncoder.normalize_text(target)
-        #     argmax_wer = calc_wer(target, argmax_pred) * 100
-        #     argmax_cer = calc_cer(target, argmax_pred) * 100
-
-        #     if not is_train:
-        #         beam_wer = calc_wer(target, beam_pred) * 100
-        #         beam_cer = calc_cer(target, beam_pred) * 100
-
-        #     rows[Path(audio_path).name] = {
-        #         "target": target,
-        #         "raw prediction": raw_pred,
-        #         "argmax_pred": argmax_pred,
-        #         "argmax_wer": argmax_wer,
-        #         "argmax_cer": argmax_cer,
-        #     }
-
-        #     if not is_train:
-        #         rows[Path(audio_path).name]["beam_pred"] = beam_pred
-        #         rows[Path(audio_path).name]["beam_wer"] = beam_wer
-        #         rows[Path(audio_path).name]["beam_cer"] = beam_cer
-
-        # self.writer.add_table(
-        #     "predictions", pd.DataFrame.from_dict(rows, orient="index")
-        # )
-
-    def _log_spectrogram(self, spectrogram_batch):
-        spectrogram = random.choice(spectrogram_batch.cpu())
-        image = PIL.Image.open(plot_spectrogram_to_buf(spectrogram))
-        self.writer.add_image("spectrogram", ToTensor()(image))
+        for i in range(target.size(0)):
+            self.writer.add_audio(
+                f"mix-{step}-{i}",
+                mix[i, 0],
+                sample_rate=self.config["preprocessing"]["sr"],
+            )
+            self.writer.add_audio(
+                f"target-{step}-{i}",
+                target[i, 0],
+                sample_rate=self.config["preprocessing"]["sr"],
+            )
+            self.writer.add_audio(
+                f"pred-{step}-{i}",
+                pred[i, 0],
+                sample_rate=self.config["preprocessing"]["sr"],
+            )
 
     @torch.no_grad()
     def get_grad_norm(self, norm_type=2):
