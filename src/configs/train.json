@@ -40,7 +40,7 @@
         {
           "type": "LibrispeechSSDataset",
           "args": {
-            "data_dir": "data/datasets/librispeech_ss/train",
+            "data_dir": "/kaggle/input/librispeech-ss/librispeech_ss/train",
             "limit": 10
           }
         }
@@ -53,7 +53,7 @@
         {
           "type": "LibrispeechSSDataset",
           "args": {
-            "data_dir": "data/datasets/librispeech_ss/val",
+            "data_dir": "/kaggle/input/librispeech-ss/librispeech_ss/val",
             "limit": 10
           }
         }
