@@ -1,10 +1,10 @@
 {
-  "name": "default_config",
+  "name": "test",
   "n_gpu": 1,
   "preprocessing": {
     "sr": 16000,
     "spectrogram": {
-      "type": "MelSpectrogram",
+      "type": "MFCC",
       "args": {
       }
     },
@@ -12,60 +12,36 @@
   },
   "augmentations": {
     "wave": [
-      {
-        "type": "Gain",
-        "args": {
-        }
-      },
-      {
-        "type": "GaussianNoise",
-        "args": {
-          "variance": 0.005
-        }
-      },
-      {
-        "type": "Speedup",
-        "args": {
-          "speedup_min": 0.7,
-          "speedup_max": 1.3
-        }
-      }
     ],
     "spectrogram": [
-      {
-        "type": "FreqMask",
-        "args": {
-          "freq_mask_param": 30
-        }
-      },
-      {
-        "type": "TimeMask",
-        "args": {
-          "time_mask_param": 30
-        }
-      }
     ]
   },
   "arch": {
-    "type": "Conformer",
+    "type": "SpEx",
     "args": {
-      "input_dim": 128,
-      "num_heads": 4,
-      "ffn_dim": 256,
-      "num_layers": 8,
-      "kernel_size": 31,
-      "dropout": 0.1
+      "short_window_len": 40,
+      "middle_window_len": 160,
+      "long_window_len": 320,
+      "decoder_dim": 256,
+      "res_blocks_num": 3,
+      "tcn_depth": 8,
+      "tcn_in_channels": 128,
+      "tcn_out_channels": 256,
+      "tcn_kernel_size": 3,
+      "speakers_num": 251,
+      "speakers_emb_dim": 128
     }
   },
   "data": {
     "test": {
-      "batch_size": 50,
-      "num_workers": 5,
+      "batch_size": 2,
+      "num_workers": 0,
       "datasets": [
         {
-          "type": "LibrispeechDataset",
+          "type": "LibrispeechSSDataset",
           "args": {
-            "part": "test-clean"
+            "data_dir": "data/datasets/librispeech_ss/val",
+            "limit": 10
           }
         }
       ]
@@ -74,7 +50,7 @@
   "optimizer": {
     "type": "Adam",
     "args": {
-      "lr": 3e-3
+      "lr": 3e-4
     }
   },
   "loss": {
@@ -83,29 +59,16 @@
   },
   "metrics": [
     {
-      "type": "ArgmaxWERMetric",
+      "type": "PESQMetric",
       "args": {
-        "name": "WER (argmax)"
+        "sr": 16000,
+        "name": "PESQ"
       }
     },
     {
-      "type": "ArgmaxCERMetric",
+      "type": "SISDRMetric",
       "args": {
-        "name": "CER (argmax)"
-      }
-    },
-    {
-      "type": "BeamSearchWERMetric",
-      "args": {
-        "name": "WER (beam search)",
-        "beam_size": 10
-      }
-    },
-    {
-      "type": "BeamSearchCERMetric",
-      "args": {
-        "name": "CER (beam search)",
-        "beam_size": 10
+        "name": "SISDR"
       }
     }
   ],
@@ -120,7 +83,6 @@
     }
   },
   "trainer": {
-    "beam_size": 10,
     "epochs": 50,
     "save_dir": "saved/",
     "save_period": 1,
@@ -128,7 +90,7 @@
     "monitor": "min val_loss",
     "early_stop": 1000,
     "visualize": "wandb",
-    "wandb_project": "dla-1-asr",
+    "wandb_project": "dla-2-ss",
     "len_epoch": 1000,
     "grad_norm_clip": 10
   }
