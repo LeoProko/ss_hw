@@ -12,12 +12,13 @@ from src.metric.utils import calc_cer
 class PESQMetric(BaseMetric):
     def __init__(self, sr: int, device, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.device = device
         self.pesq = PESQ(sr, "wb").to(device)
 
     def __call__(self, pred, target, *args, **kwargs):
         valid_size = min(pred.size(-1), target.size(-1))
         pesqs = [
-            self.pesq(pred[i, 0, :valid_size], target[i, 0, :valid_size])
+            self.pesq(pred[i, 0, :valid_size].to(device), target[i, 0, :valid_size].to(device))
             for i in range(pred.size(0))
         ]
         return sum(pesqs) / len(pesqs)
