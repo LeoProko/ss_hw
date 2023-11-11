@@ -29,32 +29,30 @@
       "tcn_out_channels": 256,
       "tcn_kernel_size": 3,
       "speakers_num": 251,
-      "speakers_emb_dim": 128
+      "speakers_emb_dim": 256
     }
   },
   "data": {
     "train": {
-      "batch_size": 2,
+      "batch_size": 3,
       "num_workers": 0,
       "datasets": [
         {
           "type": "LibrispeechSSDataset",
           "args": {
-            "data_dir": "/kaggle/input/librispeech-ss/librispeech_ss/train",
-            "limit": 10
+            "data_dir": "/kaggle/input/librispeech-ss/librispeech_ss/train"
           }
         }
       ]
     },
     "val": {
-      "batch_size": 2,
+      "batch_size": 3,
       "num_workers": 0,
       "datasets": [
         {
           "type": "LibrispeechSSDataset",
           "args": {
-            "data_dir": "/kaggle/input/librispeech-ss/librispeech_ss/val",
-            "limit": 10
+            "data_dir": "/kaggle/input/librispeech-ss/librispeech_ss/val"
           }
         }
       ]
@@ -89,14 +87,14 @@
     "type": "OneCycleLR",
     "args": {
       "steps_per_epoch": 1000,
-      "epochs": 50,
+      "epochs": 10,
       "anneal_strategy": "cos",
-      "max_lr": 3e-3,
+      "max_lr": 3e-4,
       "pct_start": 0.1
     }
   },
   "trainer": {
-    "epochs": 50,
+    "epochs": 10,
     "save_dir": "saved/",
     "save_period": 1,
     "verbosity": 2,
