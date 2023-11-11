@@ -20,6 +20,6 @@ class PESQMetric(BaseMetric):
         pesqs = [
             self.pesq(pred[i, 0, :valid_size].to(self.device), target[i, 0, :valid_size].to(self.device))
             for i in range(pred.size(0))
-            if not (target[i, 0, :valid_size] == 0).all()
+            if not (target[i, 0, :valid_size] == 0).all() and not (pred[i, 0, :valid_size] == 0).all()
         ]
         return sum(pesqs) / len(pesqs) if pesqs else 0
