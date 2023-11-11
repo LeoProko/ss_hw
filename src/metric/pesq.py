@@ -18,7 +18,7 @@ class PESQMetric(BaseMetric):
     def __call__(self, pred, target, *args, **kwargs):
         valid_size = min(pred.size(-1), target.size(-1))
         pesqs = [
-            self.pesq(pred[i, 0, :valid_size].to(device), target[i, 0, :valid_size].to(device))
+            self.pesq(pred[i, 0, :valid_size].to(self.device), target[i, 0, :valid_size].to(self.device))
             for i in range(pred.size(0))
         ]
         return sum(pesqs) / len(pesqs)
