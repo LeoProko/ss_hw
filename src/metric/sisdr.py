@@ -8,9 +8,9 @@ from src.base.base_metric import BaseMetric
 
 
 class SISDRMetric(BaseMetric):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, device, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.sisdr = SISDR()
+        self.sisdr = SISDR().to(device)
 
     def __call__(self, pred, target, *args, **kwargs):
         valid_size = min(pred.size(-1), target.size(-1))

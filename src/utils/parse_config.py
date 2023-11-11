@@ -89,7 +89,7 @@ class ConfigParser:
         return cls(config, resume, modification)
 
     @staticmethod
-    def init_obj(obj_dict, default_module, *args, **kwargs):
+    def init_obj(obj_dict, default_module, *args, metric_device=None, **kwargs):
         """
         Finds a function handle with the name given as 'type' in config, and returns the
         instance initialized with corresponding arguments given.
@@ -103,6 +103,8 @@ class ConfigParser:
 
         module_name = obj_dict["type"]
         module_args = dict(obj_dict["args"])
+        if metric_device is not None:
+            module_args["device"] = metric_device
         assert all(
             [k not in module_args for k in kwargs]
         ), "Overwriting kwargs given in config file is not allowed"

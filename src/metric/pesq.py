@@ -10,9 +10,9 @@ from src.metric.utils import calc_cer
 
 
 class PESQMetric(BaseMetric):
-    def __init__(self, sr: int, *args, **kwargs):
+    def __init__(self, sr: int, device, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.pesq = PESQ(sr, "wb")
+        self.pesq = PESQ(sr, "wb").to(device)
 
     def __call__(self, pred, target, *args, **kwargs):
         valid_size = min(pred.size(-1), target.size(-1))
