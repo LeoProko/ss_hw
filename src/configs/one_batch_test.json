@@ -22,14 +22,14 @@
       "short_window_len": 40,
       "middle_window_len": 160,
       "long_window_len": 320,
-      "decoder_dim": 64,
+      "decoder_dim": 256,
       "res_blocks_num": 3,
-      "tcn_depth": 4,
-      "tcn_in_channels": 64,
-      "tcn_out_channels": 128,
+      "tcn_depth": 8,
+      "tcn_in_channels": 128,
+      "tcn_out_channels": 256,
       "tcn_kernel_size": 3,
       "speakers_num": 251,
-      "speakers_emb_dim": 64
+      "speakers_emb_dim": 128
     }
   },
   "data": {
