@@ -22,4 +22,4 @@ class PESQMetric(BaseMetric):
             for i in range(pred.size(0))
             if not (target[i, 0, :valid_size] == 0).all()
         ]
-        return sum(pesqs) / len(pesqs) if preds else 0
+        return sum(pesqs) / len(pesqs) if pesqs else 0
