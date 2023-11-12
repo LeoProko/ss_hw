@@ -191,8 +191,7 @@ class Trainer(BaseTrainer):
         batch = self.compute_loss(batch, is_train)
 
         if is_train:
-            batch["snr_loss"].backward()
-            batch["ce_loss"].backward()
+            (batch["snr_loss"] + batch["ce_loss"]).backward()
             self._clip_grad_norm()
             self.optimizer.step()
             if self.lr_scheduler is not None:
