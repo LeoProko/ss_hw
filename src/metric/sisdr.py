@@ -16,7 +16,10 @@ class SISDRMetric(BaseMetric):
     def __call__(self, pred, target, *args, **kwargs):
         valid_size = min(pred.size(-1), target.size(-1))
         sisdrs = [
-            self.sisdr(pred[i, 0, :valid_size].to(self.device), target[i, 0, :valid_size].to(self.device))
+            self.sisdr(
+                pred[i, 0, :valid_size].to(self.device),
+                target[i, 0, :valid_size].to(self.device),
+            )
             for i in range(pred.size(0))
         ]
         return sum(sisdrs) / len(sisdrs)

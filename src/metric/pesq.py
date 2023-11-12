@@ -16,16 +16,22 @@ class PESQMetric(BaseMetric):
         self.pesq = PESQ(sr, "wb").to(device)
 
     def __call__(self, pred, target, length, *args, **kwargs):
-        lengths = [min(min(length[i], pred.size(-1)), target.size(-1)) for i in range(len(length))]
+        lengths = [
+            min(min(length[i], pred.size(-1)), target.size(-1))
+            for i in range(len(length))
+        ]
 
         pesqs = []
 
         for i in range(pred.size(0)):
             try:
-                pesq = self.pesq(pred[i, 0, :lengths[i]].to(self.device), target[i, 0, :lengths[i]].to(self.device))
+                pesq = self.pesq(
+                    pred[i, 0, : lengths[i]].to(self.device),
+                    target[i, 0, : lengths[i]].to(self.device),
+                )
             except:
                 pesq = torch.tensor([-0.5])
-            
+
             pesqs.append(pesq)
 
         return sum(pesqs) / len(pesqs) if pesqs else 0

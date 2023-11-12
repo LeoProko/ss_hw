@@ -40,7 +40,8 @@ def main(config):
     # get function handles of loss and metrics
     loss_module = config.init_obj(config["loss"], module_loss)
     metrics = [
-        config.init_obj(metric_dict, module_metric, metric_device=device) for metric_dict in config["metrics"]
+        config.init_obj(metric_dict, module_metric, metric_device=device)
+        for metric_dict in config["metrics"]
     ]
 
     # build optimizer, learning rate scheduler. delete every line containing lr_scheduler for
