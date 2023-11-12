@@ -30,7 +30,7 @@ class PESQMetric(BaseMetric):
                     target[i, 0, : lengths[i]].to(self.device),
                 )
             except:
-                pesq = torch.tensor([-0.5].to(self.device))
+                pesq = torch.tensor([-0.5]).to(self.device)
 
             pesqs.append(pesq)
 
