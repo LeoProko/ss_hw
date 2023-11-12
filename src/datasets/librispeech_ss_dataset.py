@@ -7,7 +7,7 @@ from src.base.base_dataset import BaseDataset
 
 
 class LibrispeechSSDataset(BaseDataset):
-    def __init__(self, data_dir: str, limit: int | None = None, *args, **kwargs):
+    def __init__(self, data_dir: str, limit=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.ref = sorted(glob(os.path.join(data_dir, "*-ref.wav")))
