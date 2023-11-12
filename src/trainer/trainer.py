@@ -42,7 +42,11 @@ class Trainer(BaseTrainer):
         self.log_step = 50
 
         self.train_metrics = MetricTracker(
-            "snr_loss", "ce_loss", "grad norm", *[m.name for m in self.metrics], writer=self.writer
+            "snr_loss",
+            "ce_loss",
+            "grad norm",
+            *[m.name for m in self.metrics],
+            writer=self.writer,
         )
         self.evaluation_metrics = MetricTracker(
             "snr_loss", *[m.name for m in self.metrics], writer=self.writer
@@ -115,7 +119,9 @@ class Trainer(BaseTrainer):
                 self.writer.set_step((epoch - 1) * self.len_epoch + batch_idx)
                 self.logger.debug(
                     "Train Epoch: {} {} Loss: {:.6f}".format(
-                        epoch, self._progress(batch_idx), batch["snr_loss"].item() + batch["ce_loss"].item()
+                        epoch,
+                        self._progress(batch_idx),
+                        batch["snr_loss"].item() + batch["ce_loss"].item(),
                     )
                 )
                 self.writer.add_scalar(
