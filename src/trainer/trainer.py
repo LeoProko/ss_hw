@@ -261,17 +261,17 @@ class Trainer(BaseTrainer):
 
         for i in range(target.size(0)):
             self.writer.add_audio(
-                f"mix-{step}-{i}",
+                f"{step}-{i}-mix",
                 mix[i, 0],
                 sample_rate=self.config["preprocessing"]["sr"],
             )
             self.writer.add_audio(
-                f"target-{step}-{i}",
+                f"{step}-{i}-target",
                 target[i, 0],
                 sample_rate=self.config["preprocessing"]["sr"],
             )
             self.writer.add_audio(
-                f"pred-{step}-{i}",
+                f"{step}-{i}-pred",
                 pred[i, 0],
                 sample_rate=self.config["preprocessing"]["sr"],
             )
