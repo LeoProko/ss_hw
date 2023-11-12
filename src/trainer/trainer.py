@@ -42,7 +42,7 @@ class Trainer(BaseTrainer):
         self.log_step = 50
 
         self.train_metrics = MetricTracker(
-            "snr_loss", "ce_loss", "grad norm", *[m.name for m in self.metrics], writer=self.writer
+            "total_loss", "snr_loss", "ce_loss", "grad norm", *[m.name for m in self.metrics], writer=self.writer
         )
         self.evaluation_metrics = MetricTracker(
             "snr_loss", *[m.name for m in self.metrics], writer=self.writer
