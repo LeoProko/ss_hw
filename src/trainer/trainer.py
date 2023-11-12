@@ -42,10 +42,10 @@ class Trainer(BaseTrainer):
         self.log_step = 50
 
         self.train_metrics = MetricTracker(
-            "loss", "grad norm", *[m.name for m in self.metrics], writer=self.writer
+            "snr_loss", "ce_loss", "grad norm", *[m.name for m in self.metrics], writer=self.writer
         )
         self.evaluation_metrics = MetricTracker(
-            "loss", *[m.name for m in self.metrics], writer=self.writer
+            "snr_loss", *[m.name for m in self.metrics], writer=self.writer
         )
 
     @staticmethod
@@ -115,7 +115,7 @@ class Trainer(BaseTrainer):
                 self.writer.set_step((epoch - 1) * self.len_epoch + batch_idx)
                 self.logger.debug(
                     "Train Epoch: {} {} Loss: {:.6f}".format(
-                        epoch, self._progress(batch_idx), batch["loss"].item()
+                        epoch, self._progress(batch_idx), batch["snr_loss"].item() + batch["ce_loss"].item()
                     )
                 )
                 self.writer.add_scalar(
@@ -177,10 +177,9 @@ class Trainer(BaseTrainer):
 
         if is_train:
             ce_loss = self.ce_loss(speaker_logits, batch["speaker_id"])
-        else:
-            ce_loss = 0
+            batch["ce_loss"] = 10 * ce_loss
 
-        batch["loss"] = snr_loss + 10 * ce_loss
+        batch["snr_loss"] = snr_loss
 
         return batch
 
@@ -192,13 +191,16 @@ class Trainer(BaseTrainer):
         batch = self.compute_loss(batch, is_train)
 
         if is_train:
-            batch["loss"].backward()
+            batch["snr_loss"].backward()
+            batch["ce_loss"].backward()
             self._clip_grad_norm()
             self.optimizer.step()
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step()
+            metrics.update("ce_loss", batch["ce_loss"].item())
+            metrics.update("total_loss", batch["snr_loss"].item() + batch["ce_loss"].item())
 
-        metrics.update("loss", batch["loss"].item())
+        metrics.update("snr_loss", batch["snr_loss"].item())
 
         for met in self.metrics:
             metrics.update(met.name, met(**batch))
