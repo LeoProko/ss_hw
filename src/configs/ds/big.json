@@ -98,7 +98,7 @@
     "save_dir": "saved/",
     "save_period": 1,
     "verbosity": 2,
-    "monitor": "max SISD_val",
+    "monitor": "max SISDR_val",
     "early_stop": 1000,
     "visualize": "wandb",
     "wandb_project": "dla-2-ss",
