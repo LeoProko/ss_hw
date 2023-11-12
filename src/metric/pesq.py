@@ -34,4 +34,4 @@ class PESQMetric(BaseMetric):
 
             pesqs.append(pesq)
 
-        return sum(pesqs) / len(pesqs) if pesqs else 0
+        return sum(pesqs) / len(pesqs)
