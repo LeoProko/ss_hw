@@ -42,14 +42,14 @@ class Trainer(BaseTrainer):
         self.log_step = 50
 
         self.train_metrics = MetricTracker(
-            "snr_loss",
+            "si_sdr_loss",
             "ce_loss",
             "grad norm",
             *[m.name for m in self.metrics],
             writer=self.writer,
         )
         self.evaluation_metrics = MetricTracker(
-            "snr_loss", *[m.name for m in self.metrics], writer=self.writer
+            "si_sdr_loss", *[m.name for m in self.metrics], writer=self.writer
         )
 
     @staticmethod
@@ -121,7 +121,7 @@ class Trainer(BaseTrainer):
                     "Train Epoch: {} {} Loss: {:.6f}".format(
                         epoch,
                         self._progress(batch_idx),
-                        batch["snr_loss"].item() + batch["ce_loss"].item(),
+                        batch["si_sdr_loss"].item() + batch["ce_loss"].item(),
                     )
                 )
                 self.writer.add_scalar(
@@ -174,18 +174,20 @@ class Trainer(BaseTrainer):
         long_logits = long_logits[:, :, :max_size]
         target = target[:, :, :max_size]
 
-        snr1 = self.si_sdr(short_logits, target)
-        snr2 = self.si_sdr(middle_logits, target)
-        snr3 = self.si_sdr(long_logits, target)
-        snr_loss = (
-            -0.8 * torch.sum(snr1) - 0.1 * torch.sum(snr2) - 0.1 * torch.sum(snr3)
+        si_sdr_1 = self.si_sdr(short_logits, target)
+        si_sdr_2 = self.si_sdr(middle_logits, target)
+        si_sdr_3 = self.si_sdr(long_logits, target)
+        si_sdr_loss = (
+            -0.8 * torch.sum(si_sdr_1)
+            - 0.1 * torch.sum(si_sdr_2)
+            - 0.1 * torch.sum(si_sdr_3)
         ) / batch["mix"].size(0)
 
         if is_train:
             ce_loss = self.ce_loss(speaker_logits, batch["speaker_id"])
             batch["ce_loss"] = 10 * ce_loss
 
-        batch["snr_loss"] = snr_loss
+        batch["si_sdr_loss"] = si_sdr_loss
 
         return batch
 
@@ -197,14 +199,14 @@ class Trainer(BaseTrainer):
         batch = self.compute_loss(batch, is_train)
 
         if is_train:
-            (batch["snr_loss"] + batch["ce_loss"]).backward()
+            (batch["si_sdr_loss"] + batch["ce_loss"]).backward()
             self._clip_grad_norm()
             self.optimizer.step()
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step()
             metrics.update("ce_loss", batch["ce_loss"].item())
 
-        metrics.update("snr_loss", batch["snr_loss"].item())
+        metrics.update("si_sdr_loss", batch["si_sdr_loss"].item())
 
         for met in self.metrics:
             metrics.update(met.name, met(**batch))
