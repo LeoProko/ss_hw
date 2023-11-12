@@ -1,5 +1,5 @@
 {
-  "name": "small_test",
+  "name": "train_big",
   "n_gpu": 1,
   "preprocessing": {
     "sr": 16000,
@@ -22,19 +22,19 @@
       "short_window_len": 40,
       "middle_window_len": 160,
       "long_window_len": 320,
-      "decoder_dim": 128,
+      "decoder_dim": 256,
       "res_blocks_num": 3,
-      "tcn_depth": 4,
-      "tcn_in_channels": 64,
-      "tcn_out_channels": 128,
+      "tcn_depth": 8,
+      "tcn_in_channels": 256,
+      "tcn_out_channels": 512,
       "tcn_kernel_size": 3,
       "speakers_num": 251,
-      "speakers_emb_dim": 64
+      "speakers_emb_dim": 256
     }
   },
   "data": {
     "train": {
-      "batch_size": 10,
+      "batch_size": 3,
       "num_workers": 0,
       "datasets": [
         {
@@ -46,7 +46,7 @@
       ]
     },
     "val": {
-      "batch_size": 10,
+      "batch_size": 3,
       "num_workers": 0,
       "datasets": [
         {
@@ -86,23 +86,23 @@
   "lr_scheduler": {
     "type": "OneCycleLR",
     "args": {
-      "steps_per_epoch": 100,
-      "epochs": 50,
+      "steps_per_epoch": 1000,
+      "epochs": 10,
       "anneal_strategy": "cos",
       "max_lr": 3e-4,
       "pct_start": 0.1
     }
   },
   "trainer": {
-    "epochs": 50,
+    "epochs": 10,
     "save_dir": "saved/",
-    "save_period": 5,
+    "save_period": 1,
     "verbosity": 2,
     "monitor": "min val_loss",
-    "early_stop": 100,
+    "early_stop": 1000,
     "visualize": "wandb",
     "wandb_project": "dla-2-ss",
-    "len_epoch": 100,
+    "len_epoch": 1000,
     "grad_norm_clip": 10
   }
 }

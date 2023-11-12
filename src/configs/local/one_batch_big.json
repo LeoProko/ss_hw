@@ -1,5 +1,5 @@
 {
-  "name": "one_batch_test",
+  "name": "one_batch",
   "n_gpu": 1,
   "preprocessing": {
     "sr": 16000,
@@ -25,16 +25,16 @@
       "decoder_dim": 256,
       "res_blocks_num": 3,
       "tcn_depth": 8,
-      "tcn_in_channels": 128,
-      "tcn_out_channels": 256,
+      "tcn_in_channels": 256,
+      "tcn_out_channels": 512,
       "tcn_kernel_size": 3,
       "speakers_num": 251,
-      "speakers_emb_dim": 128
+      "speakers_emb_dim": 256
     }
   },
   "data": {
     "train": {
-      "batch_size": 2,
+      "batch_size": 10,
       "num_workers": 0,
       "datasets": [
         {
@@ -47,7 +47,7 @@
       ]
     },
     "val": {
-      "batch_size": 2,
+      "batch_size": 10,
       "num_workers": 0,
       "datasets": [
         {

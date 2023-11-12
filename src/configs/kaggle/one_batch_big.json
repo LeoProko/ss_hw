@@ -1,0 +1,110 @@
+{
+  "name": "train",
+  "n_gpu": 1,
+  "preprocessing": {
+    "sr": 16000,
+    "spectrogram": {
+      "type": "MFCC",
+      "args": {
+      }
+    },
+    "log_spec": true
+  },
+  "augmentations": {
+    "wave": [
+    ],
+    "spectrogram": [
+    ]
+  },
+  "arch": {
+    "type": "SpEx",
+    "args": {
+      "short_window_len": 40,
+      "middle_window_len": 160,
+      "long_window_len": 320,
+      "decoder_dim": 256,
+      "res_blocks_num": 3,
+      "tcn_depth": 8,
+      "tcn_in_channels": 256,
+      "tcn_out_channels": 512,
+      "tcn_kernel_size": 3,
+      "speakers_num": 251,
+      "speakers_emb_dim": 256
+    }
+  },
+  "data": {
+    "train": {
+      "batch_size": 10,
+      "num_workers": 0,
+      "datasets": [
+        {
+          "type": "LibrispeechSSDataset",
+          "args": {
+            "data_dir": "/kaggle/input/dla-ss/librispeech_ss/train",
+            "limit": 10
+          }
+        }
+      ]
+    },
+    "val": {
+      "batch_size": 10,
+      "num_workers": 0,
+      "datasets": [
+        {
+          "type": "LibrispeechSSDataset",
+          "args": {
+            "data_dir": "/kaggle/input/dla-ss/librispeech_ss/val",
+            "limit": 10
+          }
+        }
+      ]
+    }
+  },
+  "loss": {
+    "type": "CTCLoss",
+    "args": {}
+  },
+  "metrics": [
+    {
+      "type": "PESQMetric",
+      "args": {
+        "sr": 16000,
+        "name": "PESQ"
+      }
+    },
+    {
+      "type": "SISDRMetric",
+      "args": {
+        "name": "SISDR"
+      }
+    }
+  ],
+  "optimizer": {
+    "type": "Adam",
+    "args": {
+      "lr": 1e-3
+    }
+  },
+  "lr_scheduler": {
+    "type": "OneCycleLR",
+    "args": {
+      "steps_per_epoch": 100,
+      "epochs": 50,
+      "anneal_strategy": "cos",
+      "max_lr": 1e-3,
+      "pct_start": 0.1
+    }
+  },
+  "trainer": {
+    "epochs": 50,
+    "save_dir": "saved/",
+    "save_period": 1,
+    "verbosity": 2,
+    "monitor": "min val_loss",
+    "early_stop": 1000,
+    "visualize": "wandb",
+    "wandb_project": "dla-2-ss",
+    "len_epoch": 100,
+    "grad_norm_clip": 10
+  }
+}

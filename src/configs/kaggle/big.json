@@ -25,8 +25,8 @@
       "decoder_dim": 256,
       "res_blocks_num": 3,
       "tcn_depth": 8,
-      "tcn_in_channels": 128,
-      "tcn_out_channels": 256,
+      "tcn_in_channels": 256,
+      "tcn_out_channels": 512,
       "tcn_kernel_size": 3,
       "speakers_num": 251,
       "speakers_emb_dim": 256
@@ -34,25 +34,25 @@
   },
   "data": {
     "train": {
-      "batch_size": 3,
+      "batch_size": 10,
       "num_workers": 0,
       "datasets": [
         {
           "type": "LibrispeechSSDataset",
           "args": {
-            "data_dir": "data/datasets/librispeech_ss/train"
+            "data_dir": "/kaggle/input/dla-ss/librispeech_ss/train"
           }
         }
       ]
     },
     "val": {
-      "batch_size": 3,
+      "batch_size": 10,
       "num_workers": 0,
       "datasets": [
         {
           "type": "LibrispeechSSDataset",
           "args": {
-            "data_dir": "data/datasets/librispeech_ss/val"
+            "data_dir": "/kaggle/input/dla-ss/librispeech_ss/val"
           }
         }
       ]

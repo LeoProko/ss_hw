@@ -18,14 +18,14 @@ class PESQMetric(BaseMetric):
     def __call__(self, pred, target, length, *args, **kwargs):
         lengths = [min(min(length[i], pred.size(-1)), target.size(-1)) for i in range(len(length))]
 
-        pesqs = [
-            self.pesq(pred[i, 0, :lengths[i]].to(self.device), target[i, 0, :lengths[i]].to(self.device))
-            for i in range(pred.size(0))
-            if not ( torch.isclose(target[i, 0, :lengths[i]].mean(), torch.tensor([0.0])) and (target[i, 0, :lengths[i]] > -1e-8).all()
-                 or
-                torch.isclose(pred[i, 0, :lengths[i]].mean(), torch.tensor([0.0])) and (pred[i, 0, :lengths[i]] > -1e-8).all()
-                or (target[i, 0, :lengths[i]] == 0).all()
-                or (pred[i, 0, :lengths[i]] == 0).all()
-            )
-        ]
+        pesqs = []
+
+        for i in range(pred.size(0)):
+            try:
+                pesq = self.pesq(pred[i, 0, :lengths[i]].to(self.device), target[i, 0, :lengths[i]].to(self.device))
+            except:
+                pesq = torch.tensor([-0.5])
+            
+            pesqs.append(pesq)
+
         return sum(pesqs) / len(pesqs) if pesqs else 0
