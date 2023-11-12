@@ -34,4 +34,4 @@ class PESQMetric(BaseMetric):
 
             pesqs.append(pesq)
 
-        return sum(pesqs) / len(pesqs)
+        return (sum(pesqs) / len(pesqs)).squeeze().detach().cpu().item()

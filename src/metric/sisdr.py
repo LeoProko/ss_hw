@@ -22,4 +22,4 @@ class SISDRMetric(BaseMetric):
             )
             for i in range(pred.size(0))
         ]
-        return sum(sisdrs) / len(sisdrs)
+        return (sum(sisdrs) / len(sisdrs)).squeeze().detach().cpu().item()
