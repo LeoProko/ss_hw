@@ -58,12 +58,6 @@
       ]
     }
   },
-  "optimizer": {
-    "type": "Adam",
-    "args": {
-      "lr": 1e-3
-    }
-  },
   "loss": {
     "type": "CTCLoss",
     "args": {}
@@ -83,26 +77,32 @@
       }
     }
   ],
+  "optimizer": {
+    "type": "Adam",
+    "args": {
+      "lr": 1e-3
+    }
+  },
   "lr_scheduler": {
     "type": "OneCycleLR",
     "args": {
-      "steps_per_epoch": 1000,
-      "epochs": 10,
+      "steps_per_epoch": 300,
+      "epochs": 30,
       "anneal_strategy": "cos",
       "max_lr": 1e-3,
       "pct_start": 0.1
     }
   },
   "trainer": {
-    "epochs": 10,
+    "epochs": 30,
     "save_dir": "saved/",
     "save_period": 1,
     "verbosity": 2,
-    "monitor": "min val_loss",
-    "early_stop": 1000,
+    "monitor": "max SISD_val",
+    "early_stop": 600,
     "visualize": "wandb",
     "wandb_project": "dla-2-ss",
-    "len_epoch": 1000,
+    "len_epoch": 300,
     "grad_norm_clip": 10
   }
 }

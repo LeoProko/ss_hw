@@ -4,6 +4,7 @@ from torchmetrics.audio import ScaleInvariantSignalDistortionRatio as SISDR
 from torchmetrics.audio.pesq import PerceptualEvaluationSpeechQuality as PESQ
 from tqdm.auto import tqdm
 import pyloudnorm as pyln
+from torchmetrics.audio import ScaleInvariantSignalDistortionRatio as SISDR
 
 from src.base import BaseTrainer
 from src.utils import inf_loop, MetricTracker
@@ -24,6 +25,7 @@ class Trainer(BaseTrainer):
         skip_oom=True,
     ):
         super().__init__(model, criterion, metrics, optimizer, config, device)
+        self._sisdr = SISDR().to(device)
         self.skip_oom = skip_oom
         self.config = config
         self.train_dataloader = dataloaders["train"]
@@ -141,14 +143,6 @@ class Trainer(BaseTrainer):
 
         return log
 
-    @staticmethod
-    def si_sdr(est, target):
-        alpha = (target * est).sum(dim=-1) / (target.norm(dim=-1) ** 2 + 1e-8)
-        return 20 * torch.log10(
-            (alpha * target).norm(dim=-1) / ((alpha * target - est).norm(dim=-1) + 1e-8)
-            + 1e-8
-        )
-
     def compute_loss(self, batch, is_train):
         short_logits, middle_logits, long_logits, speaker_logits = self.model(**batch)
 
@@ -174,14 +168,11 @@ class Trainer(BaseTrainer):
         long_logits = long_logits[:, :, :max_size]
         target = target[:, :, :max_size]
 
-        si_sdr_1 = self.si_sdr(short_logits, target)
-        si_sdr_2 = self.si_sdr(middle_logits, target)
-        si_sdr_3 = self.si_sdr(long_logits, target)
-        si_sdr_loss = (
-            -0.8 * torch.sum(si_sdr_1)
-            - 0.1 * torch.sum(si_sdr_2)
-            - 0.1 * torch.sum(si_sdr_3)
-        ) / batch["mix"].size(0)
+        si_sdr_1 = self._sisdr(short_logits, target)
+        si_sdr_2 = self._sisdr(middle_logits, target)
+        si_sdr_3 = self._sisdr(long_logits, target)
+
+        si_sdr_loss = -0.8 * si_sdr_1 - 0.1 * si_sdr_2 - 0.1 * si_sdr_3
 
         if is_train:
             ce_loss = self.ce_loss(speaker_logits, batch["speaker_id"])
