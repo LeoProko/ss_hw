@@ -42,7 +42,7 @@ class Trainer(BaseTrainer):
         self.log_step = 50
 
         self.train_metrics = MetricTracker(
-            "total_loss", "snr_loss", "ce_loss", "grad norm", *[m.name for m in self.metrics], writer=self.writer
+            "snr_loss", "ce_loss", "grad norm", *[m.name for m in self.metrics], writer=self.writer
         )
         self.evaluation_metrics = MetricTracker(
             "snr_loss", *[m.name for m in self.metrics], writer=self.writer
@@ -197,7 +197,6 @@ class Trainer(BaseTrainer):
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step()
             metrics.update("ce_loss", batch["ce_loss"].item())
-            metrics.update("total_loss", batch["snr_loss"].item() + batch["ce_loss"].item())
 
         metrics.update("snr_loss", batch["snr_loss"].item())
 
