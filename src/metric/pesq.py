@@ -25,9 +25,13 @@ class PESQMetric(BaseMetric):
 
         for i in range(pred.size(0)):
             try:
-                pesq = self.pesq(
-                    pred[i, 0, : lengths[i]].to(self.device),
-                    target[i, 0, : lengths[i]].to(self.device),
+                pesq = (
+                    self.pesq(
+                        pred[i, 0, : lengths[i]].to(self.device),
+                        target[i, 0, : lengths[i]].to(self.device),
+                    )
+                    if torch.isfinite(pred[i, 0]).all()
+                    else torch.tensor([-0.5]).to(self.device)
                 )
             except:
                 pesq = torch.tensor([-0.5]).to(self.device)

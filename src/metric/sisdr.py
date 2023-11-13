@@ -21,5 +21,6 @@ class SISDRMetric(BaseMetric):
                 target[i, 0, :valid_size].to(self.device),
             )
             for i in range(pred.size(0))
+            if torch.isfinite(pred[i, 0]).all()
         ]
         return (sum(sisdrs) / len(sisdrs)).squeeze().detach().cpu().item()

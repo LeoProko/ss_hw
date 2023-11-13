@@ -25,37 +25,26 @@
       "decoder_dim": 256,
       "res_blocks_num": 3,
       "tcn_depth": 8,
-      "tcn_in_channels": 128,
-      "tcn_out_channels": 256,
+      "tcn_in_channels": 256,
+      "tcn_out_channels": 512,
       "tcn_kernel_size": 3,
       "speakers_num": 251,
-      "speakers_emb_dim": 128
+      "speakers_emb_dim": 256
     }
   },
   "data": {
     "test": {
-      "batch_size": 2,
+      "batch_size": 3,
       "num_workers": 0,
       "datasets": [
         {
           "type": "LibrispeechSSDataset",
           "args": {
-            "data_dir": "data/datasets/librispeech_ss/val",
-            "limit": 10
+            "data_dir": "data/datasets/librispeech_ss/val"
           }
         }
       ]
     }
-  },
-  "optimizer": {
-    "type": "Adam",
-    "args": {
-      "lr": 3e-4
-    }
-  },
-  "loss": {
-    "type": "CTCLoss",
-    "args": {}
   },
   "metrics": [
     {
@@ -72,18 +61,8 @@
       }
     }
   ],
-  "lr_scheduler": {
-    "type": "OneCycleLR",
-    "args": {
-      "steps_per_epoch": 1000,
-      "epochs": 50,
-      "anneal_strategy": "cos",
-      "max_lr": 3e-3,
-      "pct_start": 0.1
-    }
-  },
   "trainer": {
-    "epochs": 50,
+    "epochs": 10,
     "save_dir": "saved/",
     "save_period": 1,
     "verbosity": 2,
