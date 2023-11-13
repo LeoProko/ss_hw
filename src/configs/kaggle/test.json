@@ -40,7 +40,7 @@
         {
           "type": "LibrispeechSSDataset",
           "args": {
-            "data_dir": "data/datasets/librispeech_ss/val"
+            "data_dir": "/kaggle/input/dla-ss/librispeech_ss/val"
           }
         }
       ]
