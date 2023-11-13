@@ -1,5 +1,9 @@
 # Train
 
+Download checkpoint from the
+https://drive.google.com/file/d/1ojAFd3P03ua7UCskLnhAxSyZ3pyGl8E5/view?usp=sharing
+and move it to the root of this project
+
 ```bash
 python3 train.py -c src/configs/local/big.json
 ```
