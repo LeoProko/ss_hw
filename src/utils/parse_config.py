@@ -6,6 +6,8 @@ from datetime import datetime
 from functools import reduce, partial
 from operator import getitem
 from pathlib import Path
+import hydra
+from omegaconf import DictConfig, OmegaConf
 
 from src import text_encoder as text_encoder_module
 from src.base.base_text_encoder import BaseTextEncoder
@@ -14,6 +16,7 @@ from src.text_encoder import CTCCharTextEncoder
 from src.utils import read_json, write_json, ROOT_PATH
 
 
+@hydra.main(config_path="src/configs", config_name="config.yaml")
 class ConfigParser:
     def __init__(self, config, resume=None, modification=None, run_id=None):
         """
@@ -33,7 +36,7 @@ class ConfigParser:
         self._text_encoder = None
 
         # set save_dir where trained model and log will be saved.
-        save_dir = Path(self.config["trainer"]["save_dir"])
+        save_dir = Path(self._config.trainer.save_dir)
 
         exper_name = self.config["name"]
         if run_id is None:  # use timestamp as default run-id
@@ -46,47 +49,16 @@ class ConfigParser:
         self.save_dir.mkdir(parents=True, exist_ok=exist_ok)
         self.log_dir.mkdir(parents=True, exist_ok=exist_ok)
 
-        # save updated config file to the checkpoint dir
-        write_json(self.config, self.save_dir / "config.json")
+        # # save updated config file to the checkpoint dir
+        # write_json(self.config, self.save_dir / "config.json")
 
         # configure logging module
         setup_logging(self.log_dir)
         self.log_levels = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
 
-    @classmethod
-    def from_args(cls, args, options=""):
-        """
-        Initialize this class from some cli arguments. Used in train, test.
-        """
-        for opt in options:
-            args.add_argument(*opt.flags, default=None, type=opt.type)
-        if not isinstance(args, tuple):
-            args = args.parse_args()
+    def save_config(self):
+        OmegaConf.save(self._config, self.save_dir / "config.yaml")
 
-        if args.device is not None:
-            os.environ["CUDA_VISIBLE_DEVICES"] = args.device
-        if args.resume is not None:
-            resume = Path(args.resume)
-            cfg_fname = resume.parent / "config.json"
-        else:
-            msg_no_cfg = (
-                "Configuration file need to be specified. "
-                "Add '-c config.json', for example."
-            )
-            assert args.config is not None, msg_no_cfg
-            resume = None
-            cfg_fname = Path(args.config)
-
-        config = read_json(cfg_fname)
-        if args.config and resume:
-            # update new config for fine-tuning
-            config.update(read_json(args.config))
-
-        # parse custom cli options into dictionary
-        modification = {
-            opt.target: getattr(args, _get_opt_name(opt.flags)) for opt in options
-        }
-        return cls(config, resume, modification)
 
     @staticmethod
     def init_obj(obj_dict, default_module, *args, device=None, **kwargs):
@@ -183,8 +155,8 @@ def _update_config(config, modification):
         return config
 
     for k, v in modification.items():
-        if v is not None:
-            _set_by_path(config, k, v)
+        OmegaConf.update(config, key, value)
+
     return config
 
 

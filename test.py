@@ -6,6 +6,7 @@ from pathlib import Path
 import torch
 from tqdm.auto import tqdm
 import pyloudnorm as pyln
+import hydra
 
 import src.model as module_model
 from src.trainer import Trainer
@@ -36,7 +37,9 @@ def normalize_audio(sr, audios: torch.Tensor):
     ).unsqueeze(1)
 
 
-def main(config, out_file):
+@hydra.main()
+def main(config):
+    config = ConfigParser(config)
     logger = config.get_logger("test")
 
     # define cpu or gpu if possible
@@ -49,8 +52,8 @@ def main(config, out_file):
     model = config.init_obj(config["arch"], module_model)
     logger.info(model)
 
-    logger.info("Loading checkpoint: {} ...".format(config.resume))
-    checkpoint = torch.load(config.resume, map_location=device)
+    logger.info("Loading checkpoint: {} ...".format(config["resume"]))
+    checkpoint = torch.load(config["resume"], map_location=device)
     state_dict = checkpoint["state_dict"]
     if config["n_gpu"] > 1:
         model = torch.nn.DataParallel(model)
@@ -80,70 +83,9 @@ def main(config, out_file):
     sisdr_avg /= len(dataloaders["test"])
     pesq_avg /= len(dataloaders["test"])
 
-    with Path("metrics_" + out_file).open("w") as fout:
+    with Path("metrics_output.json").open("w") as fout:
         fout.write(f"sisdr: {sisdr_avg}\npesq: {pesq_avg}\n")
 
 
 if __name__ == "__main__":
-    args = argparse.ArgumentParser(description="PyTorch Template")
-    args.add_argument(
-        "-c",
-        "--config",
-        default=None,
-        type=str,
-        help="config file path (default: None)",
-    )
-    args.add_argument(
-        "-r",
-        "--resume",
-        default=str(DEFAULT_CHECKPOINT_PATH.absolute().resolve()),
-        type=str,
-        help="path to latest checkpoint (default: None)",
-    )
-    args.add_argument(
-        "-d",
-        "--device",
-        default=None,
-        type=str,
-        help="indices of GPUs to enable (default: all)",
-    )
-    args.add_argument(
-        "-o",
-        "--output",
-        default="output.json",
-        type=str,
-        help="File to write results (.json)",
-    )
-    args.add_argument(
-        "-t",
-        "--test-data-folder",
-        default=None,
-        type=str,
-        help="Path to dataset",
-    )
-    args.add_argument(
-        "-b",
-        "--batch-size",
-        default=20,
-        type=int,
-        help="Test dataset batch size",
-    )
-    args.add_argument(
-        "-j",
-        "--jobs",
-        default=1,
-        type=int,
-        help="Number of workers for test dataloader",
-    )
-
-    args = args.parse_args()
-
-    # set GPUs
-    if args.device is not None:
-        os.environ["CUDA_VISIBLE_DEVICES"] = args.device
-
-    with Path(args.config).open() as f:
-        config = ConfigParser(json.load(f))
-        config.resume = args.resume
-
-    main(config, args.output)
+    main()

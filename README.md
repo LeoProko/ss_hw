@@ -1,7 +1,7 @@
 # Train
 
 ```bash
-python3 train.py -c src/configs/local/big.json
+python3 train.py --config-path=src/configs/local --config-name=big.yaml
 ```
 
 # Test
@@ -16,5 +16,5 @@ and move it to the root of this project.
 в котором будут лежать файлы реф, микс, таргет в формате типа `61_237_000261_0-mixed.wav`
 
 ```bash
-python3 test.py -r checkpoint-epoch23.pth -c src/configs/test.json
+python3 train.py --config-path=src/configs --config-name=test.yaml +resume="/Users/leoproko/hse_ami/ml/dla2023/hw2_ss/ss_hw/checkpoint-epoch23.pth"
 ```

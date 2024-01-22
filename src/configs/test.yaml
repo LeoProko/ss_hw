@@ -1,0 +1,52 @@
+name: test
+n_gpu: 1
+preprocessing:
+  sr: 16000
+  spectrogram:
+    type: MFCC
+    args: {}
+  log_spec: true
+augmentations:
+  wave: []
+  spectrogram: []
+arch:
+  type: SpEx
+  args:
+    short_window_len: 40
+    middle_window_len: 160
+    long_window_len: 320
+    decoder_dim: 256
+    res_blocks_num: 3
+    tcn_depth: 8
+    tcn_in_channels: 256
+    tcn_out_channels: 512
+    tcn_kernel_size: 3
+    speakers_num: 251
+    speakers_emb_dim: 256
+data:
+  test:
+    batch_size: 3
+    num_workers: 0
+    datasets:
+    - type: LibrispeechSSDataset
+      args:
+        data_dir: /Users/leoproko/hse_ami/ml/dla2023/hw2_ss/ss_hw/data/datasets/librispeech_ss/val
+metrics:
+- type: PESQMetric
+  args:
+    sr: 16000
+    name: PESQ
+- type: SISDRMetric
+  args:
+    name: SISDR
+trainer:
+  epochs: 10
+  save_dir: saved/
+  save_period: 1
+  verbosity: 2
+  monitor: max SISDR_val
+  early_stop: 1000
+  visualize: wandb
+  wandb_project: dla-2-ss
+  len_epoch: 1000
+  grad_norm_clip: 10

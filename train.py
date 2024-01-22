@@ -4,6 +4,7 @@ import warnings
 
 import numpy as np
 import torch
+import hydra
 
 import src.loss as module_loss
 import src.metric as module_metric
@@ -22,7 +23,9 @@ torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
 
 
+@hydra.main()
 def main(config):
+    config = ConfigParser(config)
     logger = config.get_logger("train")
 
     dataloaders = get_dataloaders(config)
@@ -68,36 +71,4 @@ def main(config):
 
 
 if __name__ == "__main__":
-    args = argparse.ArgumentParser(description="PyTorch Template")
-    args.add_argument(
-        "-c",
-        "--config",
-        default=None,
-        type=str,
-        help="config file path (default: None)",
-    )
-    args.add_argument(
-        "-r",
-        "--resume",
-        default=None,
-        type=str,
-        help="path to latest checkpoint (default: None)",
-    )
-    args.add_argument(
-        "-d",
-        "--device",
-        default=None,
-        type=str,
-        help="indices of GPUs to enable (default: all)",
-    )
-
-    # custom cli options to modify configuration from default values given in json file.
-    CustomArgs = collections.namedtuple("CustomArgs", "flags type target")
-    options = [
-        CustomArgs(["--lr", "--learning_rate"], type=float, target="optimizer;args;lr"),
-        CustomArgs(
-            ["--bs", "--batch_size"], type=int, target="data_loader;args;batch_size"
-        ),
-    ]
-    config = ConfigParser.from_args(args, options)
-    main(config)
+    main()
